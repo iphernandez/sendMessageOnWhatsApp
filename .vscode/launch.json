@@ -1,0 +1,34 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Launch JSApp",
+            "type": "node",
+            "request": "launch",
+            "skipFiles": ["<node_internals>/**"],
+            "runtimeExecutable": "nodemon",
+            "program": "index.js",
+            "cwd": "${workspaceFolder}\\jsApp",
+            "console": "integratedTerminal"
+        },
+        {
+            "name": "Launch PYApp",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "main.py",
+            "cwd": "${workspaceFolder}\\pythonApp"
+        },
+        {
+            "name": "Launch TSApp",
+            "type": "node",
+            "request": "launch",
+            "skipFiles": ["<node_internals>/**"],
+            "program": "index.ts",
+            "cwd": "${workspaceFolder}\\tsApp",
+            "console": "integratedTerminal"
+        }
+    ]
+}

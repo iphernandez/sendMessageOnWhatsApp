@@ -1,0 +1,9 @@
+Grupo de Whatsapp: {groupName}
+
+Futbol Jueves `{diaDeJuego} {horaDeJuego}` -- *Convocatoria* -- Coloso de Hillsboro (https://goo.gl/maps/mwWiu8p9EE23uZ7L8)
+
+_*TEMPORADA {inicioTemporadaAA}-{finTemporadaAA}*_
+
+_*FECHA {semanaTemporada}*_
+
+> `Por favor confirmar su asistencia al Coloso de Hillsboro en el chat.`
