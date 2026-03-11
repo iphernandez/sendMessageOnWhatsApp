@@ -5,6 +5,16 @@
     "version": "0.2.0",
     "configurations": [
         {
+            "name": "Launch WebJSApp",
+            "type": "node",
+            "request": "launch",
+            "skipFiles": ["<node_internals>/**"],
+            "runtimeExecutable": "nodemon",
+            "program": "index.js",
+            "cwd": "${workspaceFolder}\\webJsApp",
+            "console": "integratedTerminal"
+        },
+        {
             "name": "Launch JSApp",
             "type": "node",
             "request": "launch",
