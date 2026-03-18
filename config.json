@@ -1,0 +1,31 @@
+{
+    "group": "Top secret - Gala 2025 organizers",
+    "seasons": [
+        {
+            "season": "Invierno",
+            "LOCATION": "Coloso de Hillsboro",
+            "LOCATION_URL": "https://maps.app.goo.gl/8AnxvUT56JAEeRf57",
+            "TIME": "7:00 PM",
+            "WEEK_NUMBER": 13,
+            "YELLOW_CARDS_LATE": 0,
+            "RED_CARDS_LATE": 0,
+            "RED_CARDS_PAYMENT": 0
+        },
+        {
+            "season": "Verano",
+            "LOCATION": "PCC Rock Creek Arena",
+            "LOCATION_URL": "https://maps.app.goo.gl/JJmFRyPEDTFnWFJJ7",
+            "TIME": "6:30 PM",
+            "WEEK_NUMBER": 1,
+            "YELLOW_CARDS_LATE": 0,
+            "RED_CARDS_LATE": 0,
+            "RED_CARDS_PAYMENT": 0
+        }
+    ],
+    "poll": {
+        "question": "¿Voy a jugar el Jueves {{DATE}} a las {{TIME}} y voy a llegar puntual?",
+        "options": "Sí,No",
+        "multiple_options": "n",
+        "answer": "Sí"
+    }
+}

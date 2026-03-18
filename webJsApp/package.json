@@ -8,6 +8,9 @@
   "type": "module",
   "scripts": {
     "start": "node index.js",
+    "auto:convocatoria": "node index.js --auto",
+    "auto:invierno": "node index.js --auto --season Invierno",
+    "auto:verano": "node index.js --auto --season Verano",
     "debug": "nodemon index.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
