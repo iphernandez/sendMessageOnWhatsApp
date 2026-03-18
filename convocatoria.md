@@ -19,19 +19,13 @@ _*FECHA {{WEEK_NUMBER}} *_
 > Cada jugador es responsable de pagar la renta de la cancha a tiempo.
 > `REGLAMENTO: 
 
-—---------------------------------------------------------------------------------
-| Infracción                        |   Tarjeta     | Sanción                    |
-—---------------------------------------------------------------------------------
-| Llegar tarde 5 minutos o más      |   Amarilla    |     -                      |
-| por primera vez                   |               |                            |
-—---------------------------------------------------------------------------------
-| Llegar tarde 5 minutos o más      |     Roja      | 1 Partido sin jugar y      |
-| por 2 o más veces                 |               | sin puntos en la fecha en  |
-|                                   |               | la que llegó tarde         |
-—---------------------------------------------------------------------------------
-| No pagar la renta de la           |      Roja     | 1 Partido sin jugar y      |
-| cancha  antes de haberse          |               | sin puntos hasta que       |
-| enviado la convocatoria           |               | pague la renta             |
-—---------------------------------------------------------------------------------
+- Por llegar tarde 5 minutos o más, por primera vez: 
+    - Tajeta _*Amarilla*_
+- Por llegar tarde 5 minutos o más, por 2 o más veces: 
+    - Tarjeta: _*Roja*_ 
+    - Sanción: _*1 Partido sin jugar y sin puntos en la fecha en la que llegó tarde*_
+- Por no pagar la renta de la cancha  antes de haberse enviado la convocatoria: 
+    - Tarjeta: _*Roja*_
+    - Sanción: _*1 Partido sin jugar y sin puntos hasta que pague la renta*_
 
  _*La Presidencia ÚNICAMENTE contactará para que paguen a los jugadores que tengan MENOS de 17 años, en cuyo caso se contactará primero a sus representantes.*_
