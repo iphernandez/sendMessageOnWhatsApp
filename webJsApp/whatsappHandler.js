@@ -44,22 +44,32 @@ export class WhatsAppHandler {
     }
 
     /**
-     * Find a WhatsApp group chat by its name.
+     * Find a WhatsApp group chat by its name, retrying a few times to allow
+     * chats to finish syncing after the client becomes ready.
      * @param {string} groupName - The name of the group to find.
+     * @param {number} [retries=5] - Number of attempts before giving up.
+     * @param {number} [delayMs=3000] - Milliseconds to wait between attempts.
      * @returns {Promise<object>} The group chat object.
      */
-    async findGroup(groupName) {
-        const chats = await this.client.getChats();
-        const group = chats.find(
-            (chat) => chat.isGroup && chat.name === groupName
-        );
+    async findGroup(groupName, retries = 5, delayMs = 3000) {
+        for (let attempt = 1; attempt <= retries; attempt++) {
+            const chats = await this.client.getChats();
+            const group = chats.find(
+                (chat) => chat.isGroup && chat.name === groupName
+            );
 
-        if (!group) {
-            throw new Error(`Group "${groupName}" not found.`);
+            if (group) {
+                console.log(`Found group: "${group.name}" (${group.id._serialized})`);
+                return group;
+            }
+
+            if (attempt < retries) {
+                console.log(`Group "${groupName}" not found yet, retrying in ${delayMs / 1000}s... (${attempt}/${retries})`);
+                await new Promise((resolve) => setTimeout(resolve, delayMs));
+            }
         }
 
-        console.log(`Found group: "${group.name}" (${group.id._serialized})`);
-        return group;
+        throw new Error(`Group "${groupName}" not found after ${retries} attempts.`);
     }
 
     /**
@@ -71,6 +81,7 @@ export class WhatsAppHandler {
     async sendMessage(groupName, message) {
         const group = await this.findGroup(groupName);
         await group.sendMessage(message);
+        await new Promise((resolve) => setTimeout(resolve, 3000));
         console.log(`Message sent to group "${groupName}".`);
     }
 
@@ -85,6 +96,7 @@ export class WhatsAppHandler {
         const group = await this.findGroup(groupName);
         const media = MessageMedia.fromFilePath(filePath);
         await group.sendMessage(media, { caption });
+        await new Promise((resolve) => setTimeout(resolve, 3000));
         console.log(`Picture "${filePath}" sent to group "${groupName}".`);
     }
 
@@ -106,6 +118,7 @@ export class WhatsAppHandler {
         });
 
         const sentMessage = await group.sendMessage(poll);
+        await new Promise((resolve) => setTimeout(resolve, 3000));
         console.log(`Poll "${pollName}" created in group "${groupName}".`);
         return sentMessage;
     }
@@ -149,7 +162,12 @@ export class WhatsAppHandler {
      * @returns {Promise<void>}
      */
     async destroy() {
-        await this.client.destroy();
-        console.log('WhatsApp client session closed.');
+        try {
+            await this.client.destroy();
+            console.log('WhatsApp client session closed.');
+        } catch {
+            // Ignore errors during shutdown — the browser may already be closing.
+            console.log('Ignore errors during shutdown — the browser may already be closing.');
+        }
     }
 }

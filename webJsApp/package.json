@@ -8,9 +8,10 @@
   "type": "module",
   "scripts": {
     "start": "node index.js",
-    "auto:convocatoria": "node index.js --auto",
-    "auto:invierno": "node index.js --auto --season Invierno",
-    "auto:verano": "node index.js --auto --season Verano",
+    "auto:convocatoria": "node index.js --auto --type convocatoria --season Invierno",
+    "auto:invierno": "node index.js --auto --type convocatoria --season Invierno",
+    "auto:verano": "node index.js --auto --type convocatoria --season Verano",
+    "auto:convocados": "node index.js --auto --type convocados",
     "debug": "nodemon index.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
