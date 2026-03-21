@@ -158,6 +158,59 @@ export class WhatsAppHandler {
     }
 
     /**
+     * Get the list of voters for a specific option in a poll.
+     * @param {string} groupName - The target group name.
+     * @param {string} pollName - The poll question/title to search for.
+     * @param {string} optionText - The poll option text to get voters for.
+     * @returns {Promise<{ name: string, number: string }[]>} Array of voters for the specified option.
+     */
+    async getPollOptionVoters(groupName, pollName, optionText) {
+        const group = await this.findGroup(groupName);
+
+        const messages = await group.fetchMessages({ limit: 50 });
+        const pollMessage = messages
+            .reverse()
+            .find(
+                (msg) =>
+                    msg.type === 'poll_creation' &&
+                    msg.body === pollName
+            );
+
+        if (!pollMessage) {
+            throw new Error(
+                `Poll "${pollName}" not found in recent messages of group "${groupName}".`
+            );
+        }
+
+        const votes = pollMessage.votes ?? [];
+
+        if (votes.length === 0) {
+            console.log(`No votes found for poll "${pollName}".`);
+            return [];
+        }
+
+        const voters = [];
+        for (const vote of votes) {
+            const selectedNames = (vote.selectedOptions ?? []).map((opt) =>
+                typeof opt === 'string' ? opt : String(opt.name ?? '')
+            );
+
+            if (selectedNames.includes(optionText)) {
+                const contact = await vote.voter.getContact();
+                voters.push({
+                    name: contact.pushname || contact.name || contact.number,
+                    number: contact.number,
+                });
+            }
+        }
+
+        console.log(
+            `Found ${voters.length} voter(s) for option "${optionText}" in poll "${pollName}".`
+        );
+        return voters;
+    }
+
+    /**
      * Gracefully destroy the WhatsApp client session.
      * @returns {Promise<void>}
      */

@@ -169,6 +169,85 @@ function resolveSeasonIndex(config, requestedSeason) {
     return seasonIndex;
 }
 
+function isDateInSeasonRange(dateStr, startDateStr, endDateStr) {
+    const [playMonth, playDay] = dateStr.split('-').map(Number);
+    const [startMonth, startDay] = startDateStr.split('-').map(Number);
+    const [endMonth, endDay] = endDateStr.split('-').map(Number);
+
+    if (startMonth < endMonth) {
+        // Normal range (within same year, e.g., 04-01 to 09-30)
+        if (playMonth < startMonth || playMonth > endMonth) {
+            return false;
+        }
+        if (playMonth === startMonth && playDay < startDay) {
+            return false;
+        }
+        if (playMonth === endMonth && playDay > endDay) {
+            return false;
+        }
+        return true;
+    } else if (startMonth > endMonth) {
+        // Wrapped range (e.g., 10-01 to 03-31)
+        // Match if: (month >= startMonth) OR (month <= endMonth)
+        if (playMonth > startMonth || playMonth < endMonth) {
+            return true;
+        }
+        if (playMonth === startMonth && playDay >= startDay) {
+            return true;
+        }
+        if (playMonth === endMonth && playDay <= endDay) {
+            return true;
+        }
+        return false;
+    } else {
+        // startMonth === endMonth (entire month range)
+        if (playMonth !== startMonth) {
+            return false;
+        }
+        if (playDay < startDay || playDay > endDay) {
+            return false;
+        }
+        return true;
+    }
+}
+
+function resolveSeasonByDate(config, playDate) {
+    const seasons = Array.isArray(config.seasons) ? config.seasons : [];
+
+    if (seasons.length === 0) {
+        throw new Error('No seasons were found in config.json under "seasons".');
+    }
+
+    const month = String(playDate.getMonth() + 1).padStart(2, '0');
+    const day = String(playDate.getDate()).padStart(2, '0');
+    const dateStr = `${month}-${day}`;
+
+    const matchingSeason = seasons.find((season) => {
+        const startDate = String(season.startDate || '');
+        const endDate = String(season.endDate || '');
+
+        if (!startDate || !endDate) {
+            return false;
+        }
+
+        return isDateInSeasonRange(dateStr, startDate, endDate);
+    });
+
+    if (!matchingSeason) {
+        throw new Error(
+            `No matching season found for date ${dateStr}. Check season date ranges in config.json.`
+        );
+    }
+
+    return matchingSeason;
+}
+
+function resolveSeasonIndexByDate(config, playDate) {
+    const matchingSeason = resolveSeasonByDate(config, playDate);
+    const seasons = Array.isArray(config.seasons) ? config.seasons : [];
+    return seasons.findIndex((s) => s.season === matchingSeason.season);
+}
+
 async function runAutomatedConvocadosFlow(wsaHdl) {
     const configPath = path.join(workspaceRoot, 'config.json');
 
@@ -238,11 +317,22 @@ async function runAutomatedConvocatoriaFlow(wsaHdl, options = {}) {
         throw new Error(`Message file not found: ${messagePath}`);
     }
 
-    const seasonIndex = resolveSeasonIndex(convocatoriaConfig, options.seasonName);
-    const season = resolveSeason(convocatoriaConfig, options.seasonName);
-
     const playDate = getNextThursday(new Date());
     const renderedDate = formatDateForMessage(playDate);
+
+    // Use manually specified season if provided, otherwise use date-based resolution
+    let seasonIndex;
+    let season;
+    
+    if (options.seasonName) {
+        // Manual season override
+        seasonIndex = resolveSeasonIndex(convocatoriaConfig, options.seasonName);
+        season = convocatoriaConfig.seasons[seasonIndex];
+    } else {
+        // Date-based season resolution
+        seasonIndex = resolveSeasonIndexByDate(convocatoriaConfig, playDate);
+        season = convocatoriaConfig.seasons[seasonIndex];
+    }
 
     const variables = {
         DATE: renderedDate,

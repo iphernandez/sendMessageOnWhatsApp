@@ -10,6 +10,8 @@
         "seasons": [
             {
                 "season": "Invierno",
+                "startDate": "10-01",
+                "endDate": "03-31",
                 "LOCATION": "Coloso de Hillsboro",
                 "LOCATION_URL": "https://maps.app.goo.gl/8AnxvUT56JAEeRf57",
                 "TIME": "7:00 PM",
@@ -21,6 +23,8 @@
             },
             {
                 "season": "Verano",
+                "startDate": "04-01",
+                "endDate": "09-30",
                 "LOCATION": "PCC Rock Creek Arena",
                 "LOCATION_URL": "https://maps.app.goo.gl/JJmFRyPEDTFnWFJJ7",
                 "TIME": "6:30 PM",
