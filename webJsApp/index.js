@@ -10,6 +10,8 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const workspaceRoot = path.resolve(__dirname, '..');
 const cliHelpPath = path.join(__dirname, 'CLI_HELP.md');
+const defaultProfileKey = 'FFCH';
+const testProfileKey = 'TEST';
 
 const rl = readline.createInterface({
     input: process.stdin,
@@ -60,6 +62,31 @@ function loadCliHelp() {
 
     const markdown = fs.readFileSync(cliHelpPath, 'utf8');
     return renderMarkdownForConsole(markdown);
+}
+
+function loadProfileConfig(profileKey = defaultProfileKey) {
+    const configPath = path.join(workspaceRoot, 'config.json');
+
+    if (!fs.existsSync(configPath)) {
+        throw new Error(`Config file not found: ${configPath}`);
+    }
+
+    const rawConfig = fs.readFileSync(configPath, 'utf8');
+    const rootConfig = JSON.parse(rawConfig);
+    const profileConfig = rootConfig[profileKey];
+
+    if (!profileConfig) {
+        throw new Error(
+            `Config profile "${profileKey}" was not found in config.json. Available profiles: ${Object.keys(rootConfig).join(', ')}`
+        );
+    }
+
+    return {
+        configPath,
+        rootConfig,
+        profileConfig,
+        profileKey,
+    };
 }
 
 function getNextThursday(baseDate = new Date()) {
@@ -248,25 +275,18 @@ function resolveSeasonIndexByDate(config, playDate) {
     return seasons.findIndex((s) => s.season === matchingSeason.season);
 }
 
-async function runAutomatedConvocadosFlow(wsaHdl) {
-    const configPath = path.join(workspaceRoot, 'config.json');
+async function runAutomatedConvocadosFlow(wsaHdl, options = {}) {
+    const { profileConfig, profileKey } = loadProfileConfig(options.profileKey);
 
-    if (!fs.existsSync(configPath)) {
-        throw new Error(`Config file not found: ${configPath}`);
+    if (!profileConfig.convocados) {
+        throw new Error(`"convocados" section was not found in config.json under "${profileKey}".`);
     }
 
-    const rawConfig = fs.readFileSync(configPath, 'utf8');
-    const config = JSON.parse(rawConfig);
-
-    if (!config.convocados) {
-        throw new Error('"convocados" section was not found in config.json.');
-    }
-
-    const convocadosConfig = config.convocados;
+    const convocadosConfig = profileConfig.convocados;
     const messageFile = convocadosConfig.messageFile;
 
     if (!messageFile) {
-        throw new Error('"messageFile" was not found in config.json under "convocados".');
+        throw new Error(`"messageFile" was not found in config.json under "${profileKey}.convocados".`);
     }
 
     const messagePath = path.join(workspaceRoot, messageFile);
@@ -276,10 +296,10 @@ async function runAutomatedConvocadosFlow(wsaHdl) {
     }
 
     const message = fs.readFileSync(messagePath, 'utf8');
-    const groupName = convocadosConfig.group;
+    const groupName = profileConfig.group;
 
     if (!groupName) {
-        throw new Error('"group" was not found in config.json under "convocados".');
+        throw new Error(`"group" was not found in config.json under "${profileKey}".`);
     }
 
     console.log('\nMessage to send:\n');
@@ -291,24 +311,17 @@ async function runAutomatedConvocadosFlow(wsaHdl) {
 }
 
 function getAutomatedConvocatoriaContext(options = {}) {
-    const configPath = path.join(workspaceRoot, 'config.json');
+    const { configPath, rootConfig, profileConfig, profileKey } = loadProfileConfig(options.profileKey);
 
-    if (!fs.existsSync(configPath)) {
-        throw new Error(`Config file not found: ${configPath}`);
+    if (!profileConfig.convocatoria) {
+        throw new Error(`"convocatoria" section was not found in config.json under "${profileKey}".`);
     }
 
-    const rawConfig = fs.readFileSync(configPath, 'utf8');
-    const config = JSON.parse(rawConfig);
-
-    if (!config.convocatoria) {
-        throw new Error('"convocatoria" section was not found in config.json.');
-    }
-
-    const convocatoriaConfig = config.convocatoria;
+    const convocatoriaConfig = profileConfig.convocatoria;
     const messageFile = convocatoriaConfig.messageFile;
 
     if (!messageFile) {
-        throw new Error('"messageFile" was not found in config.json under "convocatoria".');
+        throw new Error(`"messageFile" was not found in config.json under "${profileKey}.convocatoria".`);
     }
 
     const messagePath = path.join(workspaceRoot, messageFile);
@@ -346,9 +359,9 @@ function getAutomatedConvocatoriaContext(options = {}) {
     const convocatoriaTemplate = fs.readFileSync(messagePath, 'utf8');
     const message = renderTemplate(convocatoriaTemplate, variables);
 
-    const groupName = convocatoriaConfig.group;
+    const groupName = profileConfig.group;
     if (!groupName) {
-        throw new Error('"group" was not found in config.json under "convocatoria".');
+        throw new Error(`"group" was not found in config.json under "${profileKey}".`);
     }
 
     const pollConfig = convocatoriaConfig.poll || {};
@@ -371,7 +384,9 @@ function getAutomatedConvocatoriaContext(options = {}) {
 
     return {
         configPath,
-        config,
+        rootConfig,
+        profileConfig,
+        profileKey,
         convocatoriaConfig,
         seasonIndex,
         season,
@@ -388,7 +403,8 @@ function getAutomatedConvocatoriaContext(options = {}) {
 async function runAutomatedConvocatoriaFlow(wsaHdl, options = {}) {
     const {
         configPath,
-        config,
+        rootConfig,
+        profileKey,
         convocatoriaConfig,
         seasonIndex,
         season,
@@ -441,9 +457,9 @@ async function runAutomatedConvocatoriaFlow(wsaHdl, options = {}) {
     }
 
     convocatoriaConfig.seasons[seasonIndex].WEEK_NUMBER = currentWeekNumber + 1;
-    fs.writeFileSync(configPath, `${JSON.stringify(config, null, 4)}\n`, 'utf8');
+    fs.writeFileSync(configPath, `${JSON.stringify(rootConfig, null, 4)}\n`, 'utf8');
     console.log(
-        `Updated config.json: season "${season.season}" WEEK_NUMBER is now ${convocatoriaConfig.seasons[seasonIndex].WEEK_NUMBER}.`
+        `Updated config.json: profile "${profileKey}", season "${season.season}" WEEK_NUMBER is now ${convocatoriaConfig.seasons[seasonIndex].WEEK_NUMBER}.`
     );
 
     console.log('Automated convocatoria flow completed successfully.');
@@ -474,6 +490,7 @@ function parseCliArgs(argv) {
     const args = {
         auto: false,
         help: false,
+        test: false,
         type: 'convocatoria',
         seasonName: null,
     };
@@ -485,6 +502,8 @@ function parseCliArgs(argv) {
             args.help = true;
         } else if (arg === '--auto') {
             args.auto = true;
+        } else if (arg === '--test') {
+            args.test = true;
         } else if (arg === '--type' && i + 1 < argv.length) {
             args.type = argv[i + 1];
             i += 1;
@@ -599,6 +618,7 @@ function showMenu() {
 
 async function main() {
     const args = parseCliArgs(process.argv);
+    const profileKey = args.test ? testProfileKey : defaultProfileKey;
 
     if (args.help) {
         console.log(loadCliHelp());
@@ -615,13 +635,17 @@ async function main() {
     if (args.auto) {
         try {
             if (args.type === 'convocados') {
-                await runAutomatedConvocadosFlow(wsaHdl);
+                await runAutomatedConvocadosFlow(wsaHdl, {
+                    profileKey,
+                });
             } else if (args.type === 'convocatoria') {
                 await runAutomatedConvocatoriaFlow(wsaHdl, {
+                    profileKey,
                     seasonName: args.seasonName,
                 });
             } else if (args.type === 'poll-votes') {
                 await runAutomatedPollVotesFlow(wsaHdl, {
+                    profileKey,
                     seasonName: args.seasonName,
                 });
             } else {
