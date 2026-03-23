@@ -1,45 +1,90 @@
 {
-    "convocados": {
-        "group": "Top secret - Gala 2025 organizers",
-        "messageFile": "convocados.md"
-    },
-    "convocatoria": {
-        "group": "Top secret - Gala 2025 organizers",
-        "messageFile": "convocatoria.md",
-        "default": "Invierno",
-        "seasons": [
-            {
-                "season": "Invierno",
-                "startDate": "10-01",
-                "endDate": "03-31",
-                "LOCATION": "Coloso de Hillsboro",
-                "LOCATION_URL": "https://maps.app.goo.gl/8AnxvUT56JAEeRf57",
-                "TIME": "7:00 PM",
-                "WEEK_NUMBER": 12,
-                "YELLOW_CARDS_LATE": 0,
-                "RED_CARDS_LATE": 0,
-                "RED_CARDS_PAYMENT": 0,
-                "INCLUDE_RULES": true
-            },
-            {
-                "season": "Verano",
-                "startDate": "04-01",
-                "endDate": "09-30",
-                "LOCATION": "PCC Rock Creek Arena",
-                "LOCATION_URL": "https://maps.app.goo.gl/JJmFRyPEDTFnWFJJ7",
-                "TIME": "6:30 PM",
-                "WEEK_NUMBER": 1,
-                "YELLOW_CARDS_LATE": 0,
-                "RED_CARDS_LATE": 0,
-                "RED_CARDS_PAYMENT": 0,
-                "INCLUDE_RULES": false
+    "FFCH": {
+        "group": "FFCH -- La M de tu mama",
+        "convocados": {
+            "messageFile": "convocados.md"
+        },
+        "convocatoria": {
+            "messageFile": "convocatoria.md",
+            "default": "Invierno",
+            "seasons": [
+                {
+                    "season": "Invierno",
+                    "startDate": "10-01",
+                    "endDate": "03-31",
+                    "LOCATION": "Coloso de Hillsboro",
+                    "LOCATION_URL": "https://maps.app.goo.gl/8AnxvUT56JAEeRf57",
+                    "TIME": "7:00 PM",
+                    "WEEK_NUMBER": 12,
+                    "YELLOW_CARDS_LATE": 0,
+                    "RED_CARDS_LATE": 0,
+                    "RED_CARDS_PAYMENT": 0,
+                    "INCLUDE_RULES": true
+                },
+                {
+                    "season": "Verano",
+                    "startDate": "04-01",
+                    "endDate": "09-30",
+                    "LOCATION": "PCC Rock Creek Arena",
+                    "LOCATION_URL": "https://maps.app.goo.gl/JJmFRyPEDTFnWFJJ7",
+                    "TIME": "6:30 PM",
+                    "WEEK_NUMBER": 1,
+                    "YELLOW_CARDS_LATE": 0,
+                    "RED_CARDS_LATE": 0,
+                    "RED_CARDS_PAYMENT": 0,
+                    "INCLUDE_RULES": false
+                }
+            ],
+            "poll": {
+                "question": "¿Voy a jugar el Jueves {{DATE}} a las {{TIME}} y voy a llegar puntual?",
+                "options": "Sí,No",
+                "multiple_options": "n",
+                "answer": "Sí"
             }
-        ],
-        "poll": {
-            "question": "¿Voy a jugar el Jueves {{DATE}} a las {{TIME}} y voy a llegar puntual?",
-            "options": "Sí,No",
-            "multiple_options": "n",
-            "answer": "Sí"
+        }
+    },
+    "TEST": {
+        "group": "Top secret - Gala 2025 organizers",
+        "convocados": {
+            "messageFile": "convocados.md"
+        },
+        "convocatoria": {
+            "messageFile": "convocatoria.md",
+            "default": "Invierno",
+            "seasons": [
+                {
+                    "season": "Invierno",
+                    "startDate": "10-01",
+                    "endDate": "03-31",
+                    "LOCATION": "Coloso de Hillsboro",
+                    "LOCATION_URL": "https://maps.app.goo.gl/8AnxvUT56JAEeRf57",
+                    "TIME": "7:00 PM",
+                    "WEEK_NUMBER": 12,
+                    "YELLOW_CARDS_LATE": 0,
+                    "RED_CARDS_LATE": 0,
+                    "RED_CARDS_PAYMENT": 0,
+                    "INCLUDE_RULES": true
+                },
+                {
+                    "season": "Verano",
+                    "startDate": "04-01",
+                    "endDate": "09-30",
+                    "LOCATION": "PCC Rock Creek Arena",
+                    "LOCATION_URL": "https://maps.app.goo.gl/JJmFRyPEDTFnWFJJ7",
+                    "TIME": "6:30 PM",
+                    "WEEK_NUMBER": 1,
+                    "YELLOW_CARDS_LATE": 0,
+                    "RED_CARDS_LATE": 0,
+                    "RED_CARDS_PAYMENT": 0,
+                    "INCLUDE_RULES": false
+                }
+            ],
+            "poll": {
+                "question": "¿Voy a jugar el Jueves {{DATE}} a las {{TIME}} y voy a llegar puntual?",
+                "options": "Sí,No",
+                "multiple_options": "n",
+                "answer": "Sí"
+            }
         }
     }
 }

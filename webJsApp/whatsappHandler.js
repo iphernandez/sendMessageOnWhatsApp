@@ -13,6 +13,38 @@ export class WhatsAppHandler {
         this.isReady = false;
     }
 
+    normalizeText(value) {
+        return String(value || '')
+            .normalize('NFD')
+            .replace(/[\u0300-\u036f]/g, '')
+            .trim()
+            .toLowerCase();
+    }
+
+    async resolveVoterContact(voterRef) {
+        if (!voterRef) {
+            return null;
+        }
+
+        if (typeof voterRef === 'string') {
+            try {
+                return await this.client.getContactById(voterRef);
+            } catch {
+                return null;
+            }
+        }
+
+        if (typeof voterRef.getContact === 'function') {
+            try {
+                return await voterRef.getContact();
+            } catch {
+                return null;
+            }
+        }
+
+        return null;
+    }
+
     /**
      * Initialize the WhatsApp client, display QR code, and wait until ready.
      * @returns {Promise<void>}
@@ -182,7 +214,9 @@ export class WhatsAppHandler {
             );
         }
 
-        const votes = pollMessage.votes ?? [];
+        const votes = typeof pollMessage.getPollVotes === 'function'
+            ? await pollMessage.getPollVotes()
+            : (pollMessage.votes ?? []);
 
         if (votes.length === 0) {
             console.log(`No votes found for poll "${pollName}".`);
@@ -195,8 +229,15 @@ export class WhatsAppHandler {
                 typeof opt === 'string' ? opt : String(opt.name ?? '')
             );
 
-            if (selectedNames.includes(optionText)) {
-                const contact = await vote.voter.getContact();
+            const matchedOption = selectedNames.some(
+                (selectedName) => this.normalizeText(selectedName) === this.normalizeText(optionText)
+            );
+
+            if (matchedOption) {
+                const contact = await this.resolveVoterContact(vote.voter);
+                if (!contact) {
+                    continue;
+                }
                 voters.push({
                     name: contact.pushname || contact.name || contact.number,
                     number: contact.number,

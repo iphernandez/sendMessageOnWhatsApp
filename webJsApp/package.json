@@ -11,6 +11,7 @@
     "auto:convocatoria": "node index.js --auto --type convocatoria",
     "auto:invierno": "node index.js --auto --type convocatoria --season Invierno",
     "auto:verano": "node index.js --auto --type convocatoria --season Verano",
+    "auto:poll-votes": "node index.js --auto --type poll-votes",
     "auto:convocados": "node index.js --auto --type convocados",
     "debug": "nodemon index.js",
     "test": "echo \"Error: no test specified\" && exit 1"

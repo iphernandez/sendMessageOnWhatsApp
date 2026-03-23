@@ -290,7 +290,7 @@ async function runAutomatedConvocadosFlow(wsaHdl) {
     console.log('Automated convocados flow completed successfully.');
 }
 
-async function runAutomatedConvocatoriaFlow(wsaHdl, options = {}) {
+function getAutomatedConvocatoriaContext(options = {}) {
     const configPath = path.join(workspaceRoot, 'config.json');
 
     if (!fs.existsSync(configPath)) {
@@ -317,19 +317,16 @@ async function runAutomatedConvocatoriaFlow(wsaHdl, options = {}) {
         throw new Error(`Message file not found: ${messagePath}`);
     }
 
-    const playDate = getNextThursday(new Date());
+    const playDate = getNextThursday(new Date('2026-03-17'));
     const renderedDate = formatDateForMessage(playDate);
 
-    // Use manually specified season if provided, otherwise use date-based resolution
     let seasonIndex;
     let season;
-    
+
     if (options.seasonName) {
-        // Manual season override
         seasonIndex = resolveSeasonIndex(convocatoriaConfig, options.seasonName);
         season = convocatoriaConfig.seasons[seasonIndex];
     } else {
-        // Date-based season resolution
         seasonIndex = resolveSeasonIndexByDate(convocatoriaConfig, playDate);
         season = convocatoriaConfig.seasons[seasonIndex];
     }
@@ -371,6 +368,37 @@ async function runAutomatedConvocatoriaFlow(wsaHdl, options = {}) {
     if (pollAnswer.length === 0) {
         throw new Error('"poll.answer" must include at least one option value.');
     }
+
+    return {
+        configPath,
+        config,
+        convocatoriaConfig,
+        seasonIndex,
+        season,
+        playDate,
+        message,
+        groupName,
+        pollQuestion,
+        pollOptions,
+        allowMultipleAnswers,
+        pollAnswer,
+    };
+}
+
+async function runAutomatedConvocatoriaFlow(wsaHdl, options = {}) {
+    const {
+        configPath,
+        config,
+        convocatoriaConfig,
+        seasonIndex,
+        season,
+        message,
+        groupName,
+        pollQuestion,
+        pollOptions,
+        allowMultipleAnswers,
+        pollAnswer,
+    } = getAutomatedConvocatoriaContext(options);
 
     console.log('\nMessage to send:\n');
     console.log(message);
@@ -419,6 +447,27 @@ async function runAutomatedConvocatoriaFlow(wsaHdl, options = {}) {
     );
 
     console.log('Automated convocatoria flow completed successfully.');
+}
+
+async function runAutomatedPollVotesFlow(wsaHdl, options = {}) {
+    const { playDate, groupName, pollQuestion, pollAnswer } = getAutomatedConvocatoriaContext(options);
+    const yesOption = pollAnswer[0] || 'Sí';
+    const voters = await wsaHdl.getPollOptionVoters(groupName, pollQuestion, yesOption);
+
+    console.log('\nPoll lookup details:');
+    console.log(`Play date: ${formatDateForMessage(playDate)}`);
+    console.log(`Poll: ${pollQuestion}`);
+    console.log(`Option: ${yesOption}`);
+
+    console.log('\nVotes:');
+    if (voters.length === 0) {
+        console.log('No voters found.');
+        return;
+    }
+
+    for (const voter of voters) {
+        console.log(`- ${voter.name} (${voter.number})`);
+    }
 }
 
 function parseCliArgs(argv) {
@@ -571,8 +620,12 @@ async function main() {
                 await runAutomatedConvocatoriaFlow(wsaHdl, {
                     seasonName: args.seasonName,
                 });
+            } else if (args.type === 'poll-votes') {
+                await runAutomatedPollVotesFlow(wsaHdl, {
+                    seasonName: args.seasonName,
+                });
             } else {
-                throw new Error(`Unknown type: ${args.type}. Supported types: convocados, convocatoria`);
+                throw new Error(`Unknown type: ${args.type}. Supported types: convocados, convocatoria, poll-votes`);
             }
         } catch (error) {
             console.error(`\nError: ${error.message}`);
