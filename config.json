@@ -15,10 +15,10 @@
                     "LOCATION": "Coloso de Hillsboro",
                     "LOCATION_URL": "https://maps.app.goo.gl/8AnxvUT56JAEeRf57",
                     "TIME": "7:00 PM",
-                    "WEEK_NUMBER": 12,
-                    "YELLOW_CARDS_LATE": 0,
+                    "WEEK_NUMBER": 13,
+                    "YELLOW_CARDS_LATE": 1,
                     "RED_CARDS_LATE": 0,
-                    "RED_CARDS_PAYMENT": 0,
+                    "RED_CARDS_PAYMENT": 2,
                     "INCLUDE_RULES": true
                 },
                 {
@@ -59,7 +59,7 @@
                     "LOCATION": "Coloso de Hillsboro",
                     "LOCATION_URL": "https://maps.app.goo.gl/8AnxvUT56JAEeRf57",
                     "TIME": "7:00 PM",
-                    "WEEK_NUMBER": 12,
+                    "WEEK_NUMBER": 13,
                     "YELLOW_CARDS_LATE": 0,
                     "RED_CARDS_LATE": 0,
                     "RED_CARDS_PAYMENT": 0,

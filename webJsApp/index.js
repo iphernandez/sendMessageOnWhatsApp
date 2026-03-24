@@ -330,7 +330,7 @@ function getAutomatedConvocatoriaContext(options = {}) {
         throw new Error(`Message file not found: ${messagePath}`);
     }
 
-    const playDate = getNextThursday(new Date('2026-03-17'));
+    const playDate = getNextThursday(new Date());
     const renderedDate = formatDateForMessage(playDate);
 
     let seasonIndex;
