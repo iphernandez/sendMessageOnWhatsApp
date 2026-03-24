@@ -10,8 +10,10 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const workspaceRoot = path.resolve(__dirname, '..');
 const cliHelpPath = path.join(__dirname, 'CLI_HELP.md');
+const scoreFilePath = path.join(workspaceRoot, 'puntuacion.json');
 const defaultProfileKey = 'FFCH';
 const testProfileKey = 'TEST';
+const defaultPuntaje = 3;
 
 const rl = readline.createInterface({
     input: process.stdin,
@@ -132,6 +134,60 @@ function parseOptions(optionsRaw) {
 
 function parseBooleanFlag(value) {
     return String(value || '').trim().toLowerCase() === 'y';
+}
+
+function normalizeLookupText(value) {
+    return String(value || '')
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .trim()
+        .toLowerCase();
+}
+
+function normalizeLookupNumber(value) {
+    return String(value || '').trim();
+}
+
+function loadScoreEntries() {
+    if (!fs.existsSync(scoreFilePath)) {
+        throw new Error(`Score file not found: ${scoreFilePath}`);
+    }
+
+    const rawScoreFile = fs.readFileSync(scoreFilePath, 'utf8');
+    const scoreData = JSON.parse(rawScoreFile);
+    const entries = Array.isArray(scoreData.puntuacion) ? scoreData.puntuacion : [];
+
+    return {
+        scoreData,
+        entries,
+    };
+}
+
+function findScoreEntry(entries, voter) {
+    const normalizedName = normalizeLookupText(voter.name);
+    const normalizedNumber = normalizeLookupNumber(voter.number);
+
+    return entries.find((entry) => {
+        const matchesName =
+            normalizedName && normalizeLookupText(entry.wanombre) === normalizedName;
+        const matchesNumber =
+            normalizedNumber && normalizeLookupNumber(entry.wanumber) === normalizedNumber;
+
+        return matchesName || matchesNumber;
+    });
+}
+
+function persistMissingScoreEntries(scoreData, missingEntries) {
+    if (missingEntries.length === 0) {
+        return;
+    }
+
+    if (!Array.isArray(scoreData.puntuacion)) {
+        scoreData.puntuacion = [];
+    }
+
+    scoreData.puntuacion.push(...missingEntries);
+    fs.writeFileSync(scoreFilePath, `${JSON.stringify(scoreData, null, 4)}\n`, 'utf8');
 }
 
 function resolveSeason(config, requestedSeason) {
@@ -330,7 +386,8 @@ function getAutomatedConvocatoriaContext(options = {}) {
         throw new Error(`Message file not found: ${messagePath}`);
     }
 
-    const playDate = getNextThursday(new Date());
+    //! For testing purposes, we can set a fixed play date. In production, this would likely be the next upcoming Thursday.
+    const playDate = getNextThursday(new Date('2026-03-17'));
     const renderedDate = formatDateForMessage(playDate);
 
     let seasonIndex;
@@ -469,6 +526,8 @@ async function runAutomatedPollVotesFlow(wsaHdl, options = {}) {
     const { playDate, groupName, pollQuestion, pollAnswer } = getAutomatedConvocatoriaContext(options);
     const yesOption = pollAnswer[0] || 'Sí';
     const voters = await wsaHdl.getPollOptionVoters(groupName, pollQuestion, yesOption);
+    const { scoreData, entries } = loadScoreEntries();
+    const missingEntries = [];
 
     console.log('\nPoll lookup details:');
     console.log(`Play date: ${formatDateForMessage(playDate)}`);
@@ -482,7 +541,29 @@ async function runAutomatedPollVotesFlow(wsaHdl, options = {}) {
     }
 
     for (const voter of voters) {
-        console.log(`- ${voter.name} (${voter.number})`);
+        const matchedEntry = findScoreEntry(entries, voter);
+
+        if (matchedEntry) {
+            console.log(`- ${matchedEntry.nombre} (${matchedEntry.puntaje})`);
+            continue;
+        }
+
+        const newEntry = {
+            nombre: voter.name,
+            wanombre: voter.name,
+            wanumber: voter.number,
+            puntaje: defaultPuntaje,
+        };
+
+        entries.push(newEntry);
+        missingEntries.push(newEntry);
+        console.log(`- ${voter.name} (${defaultPuntaje})`);
+    }
+
+    persistMissingScoreEntries(scoreData, missingEntries);
+
+    if (missingEntries.length > 0) {
+        console.log(`\nAdded ${missingEntries.length} voter(s) to puntuacion.json with default puntaje ${defaultPuntaje}.`);
     }
 }
 
