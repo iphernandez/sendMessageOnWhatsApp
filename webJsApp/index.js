@@ -387,7 +387,7 @@ function getAutomatedConvocatoriaContext(options = {}) {
     }
 
     //! For testing purposes, we can set a fixed play date. In production, this would likely be the next upcoming Thursday.
-    const playDate = getNextThursday(new Date('2026-03-17'));
+    const playDate = getNextThursday(new Date());
     const renderedDate = formatDateForMessage(playDate);
 
     let seasonIndex;

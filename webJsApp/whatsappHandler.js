@@ -166,6 +166,12 @@ export class WhatsAppHandler {
     async voteOnPoll(groupName, pollName, selectedOptions) {
         const group = await this.findGroup(groupName);
 
+        // Open the chat so WhatsApp Web loads the chat object internally.
+        // Without this, PollsSendVote.sendVote fails with
+        // "Cannot read properties of undefined (reading 'waitForChatLoading')".
+        await group.sendSeen();
+        await new Promise((resolve) => setTimeout(resolve, 2000));
+
         // Fetch recent messages to find the poll
         const messages = await group.fetchMessages({ limit: 50 });
         const pollMessage = messages

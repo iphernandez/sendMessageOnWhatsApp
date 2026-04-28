@@ -13,18 +13,6 @@
             "puntaje": 5
         },
         {
-            "nombre": "Ramiro",
-            "wanombre": "",
-            "wanumber": "",
-            "puntaje": 4
-        },
-        {
-            "nombre": "Juan",
-            "wanombre": "",
-            "wanumber": "",
-            "puntaje": 5
-        },
-        {
             "nombre": "Israel",
             "wanombre": "",
             "wanumber": "",
@@ -55,25 +43,7 @@
             "puntaje": 3
         },
         {
-            "nombre": "Yerko",
-            "wanombre": "",
-            "wanumber": "",
-            "puntaje": 1
-        },
-        {
-            "nombre": "Jose",
-            "wanombre": "",
-            "wanumber": "",
-            "puntaje": 3
-        },
-        {
             "nombre": "Andrew",
-            "wanombre": "",
-            "wanumber": "",
-            "puntaje": 2
-        },
-        {
-            "nombre": "German",
             "wanombre": "",
             "wanumber": "",
             "puntaje": 2
@@ -107,12 +77,6 @@
             "wanombre": "",
             "wanumber": "",
             "puntaje": 1
-        },
-        {
-            "nombre": "Jorge",
-            "wanombre": "",
-            "wanumber": "",
-            "puntaje": 2
         },
         {
             "nombre": "Matias",
@@ -161,6 +125,48 @@
             "wanombre": "",
             "wanumber": "",
             "puntaje": 3
+        },
+        {
+            "nombre": "Christian (Channels)",
+            "wanombre": "Christian",
+            "wanumber": "16692346197",
+            "puntaje": 3
+        },
+        {
+            "nombre": "Yerko",
+            "wanombre": "Yerko Grbic",
+            "wanumber": "19713313981",
+            "puntaje": 1
+        },
+        {
+            "nombre": "Ramiro",
+            "wanombre": "Rama",
+            "wanumber": "16508882262",
+            "puntaje": 4
+        },
+        {
+            "nombre": "Juan",
+            "wanombre": "Juan Cevallos",
+            "wanumber": "19717726406",
+            "puntaje": 3
+        },
+        {
+            "nombre": "Jose",
+            "wanombre": "JV",
+            "wanumber": "15034847590",
+            "puntaje": 3
+        },
+        {
+            "nombre": "German",
+            "wanombre": "GVA",
+            "wanumber": "15033829502",
+            "puntaje": 2
+        },
+        {
+            "nombre": "Jorge",
+            "wanombre": "Jorge Arias Velasquez",
+            "wanumber": "19713125272",
+            "puntaje": 2
         }
     ]
 }
