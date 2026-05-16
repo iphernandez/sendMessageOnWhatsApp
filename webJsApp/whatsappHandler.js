@@ -202,21 +202,41 @@ export class WhatsAppHandler {
      * @param {string} optionText - The poll option text to get voters for.
      * @returns {Promise<{ name: string, number: string }[]>} Array of voters for the specified option.
      */
-    async getPollOptionVoters(groupName, pollName, optionText) {
+    async getPollOptionVoters(groupName, pollName, optionText, options = {}) {
+        const {
+            retries = 5,
+            delayMs = 3000,
+            messageLimit = 100,
+        } = options;
+
         const group = await this.findGroup(groupName);
 
-        const messages = await group.fetchMessages({ limit: 50 });
-        const pollMessage = messages
-            .reverse()
-            .find(
-                (msg) =>
-                    msg.type === 'poll_creation' &&
-                    msg.body === pollName
-            );
+        let pollMessage = null;
+        for (let attempt = 1; attempt <= retries; attempt += 1) {
+            const messages = await group.fetchMessages({ limit: messageLimit });
+            pollMessage = messages
+                .reverse()
+                .find(
+                    (msg) =>
+                        msg.type === 'poll_creation' &&
+                        this.normalizeText(msg.body) === this.normalizeText(pollName)
+                );
+
+            if (pollMessage) {
+                break;
+            }
+
+            if (attempt < retries) {
+                console.log(
+                    `Poll "${pollName}" not found yet, retrying in ${delayMs / 1000}s... (${attempt}/${retries})`
+                );
+                await new Promise((resolve) => setTimeout(resolve, delayMs));
+            }
+        }
 
         if (!pollMessage) {
             throw new Error(
-                `Poll "${pollName}" not found in recent messages of group "${groupName}".`
+                `Poll "${pollName}" not found in recent messages of group "${groupName}" after ${retries} attempts.`
             );
         }
 

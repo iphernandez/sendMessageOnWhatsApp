@@ -524,14 +524,15 @@ async function runAutomatedConvocatoriaFlow(wsaHdl, options = {}) {
 
 async function runAutomatedPollVotesFlow(wsaHdl, options = {}) {
     const { playDate, groupName, pollQuestion, pollAnswer } = getAutomatedConvocatoriaContext(options);
+    const pollQuestionToLookup = String(options.pollQuestion || '').trim() || pollQuestion;
     const yesOption = pollAnswer[0] || 'Sí';
-    const voters = await wsaHdl.getPollOptionVoters(groupName, pollQuestion, yesOption);
+    const voters = await wsaHdl.getPollOptionVoters(groupName, pollQuestionToLookup, yesOption);
     const { scoreData, entries } = loadScoreEntries();
     const missingEntries = [];
 
     console.log('\nPoll lookup details:');
     console.log(`Play date: ${formatDateForMessage(playDate)}`);
-    console.log(`Poll: ${pollQuestion}`);
+    console.log(`Poll: ${pollQuestionToLookup}`);
     console.log(`Option: ${yesOption}`);
 
     console.log('\nVotes:');
@@ -574,6 +575,7 @@ function parseCliArgs(argv) {
         test: false,
         type: 'convocatoria',
         seasonName: null,
+        pollQuestion: null,
     };
 
     for (let i = 2; i < argv.length; i += 1) {
@@ -590,6 +592,9 @@ function parseCliArgs(argv) {
             i += 1;
         } else if (arg === '--season' && i + 1 < argv.length) {
             args.seasonName = argv[i + 1];
+            i += 1;
+        } else if (arg === '--poll-question' && i + 1 < argv.length) {
+            args.pollQuestion = argv[i + 1];
             i += 1;
         }
     }
@@ -728,6 +733,7 @@ async function main() {
                 await runAutomatedPollVotesFlow(wsaHdl, {
                     profileKey,
                     seasonName: args.seasonName,
+                    pollQuestion: args.pollQuestion,
                 });
             } else {
                 throw new Error(`Unknown type: ${args.type}. Supported types: convocados, convocatoria, poll-votes`);

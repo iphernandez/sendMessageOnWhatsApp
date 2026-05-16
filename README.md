@@ -9,6 +9,12 @@ The Web.js entrypoint now supports a built-in help option:
 node webJsApp/index.js --help
 ```
 
+For automated poll-vote lookups, you can also override the poll question from the CLI:
+
+```bash
+node webJsApp/index.js --auto --type poll-votes --poll-question "Quienes juegan hoy?"
+```
+
 The help content is stored in [webJsApp/CLI_HELP.md](c:/Development/GitHub/sendMessageOnWhatsApp/webJsApp/CLI_HELP.md) so CLI instructions can be updated without changing code.
 
 The same pattern is available in the other app variants:
