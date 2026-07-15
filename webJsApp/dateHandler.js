@@ -2,8 +2,6 @@ export class DateHandler {
     week = 7 * 24 * 60 * 60 * 1000;
     day = 24 * 60 * 60 * 1000;
 
-    constructor() {}
-
     /**
      * Get the next occurrence of a specific weekday from the given date.
      * @param {Date} initialDate - The starting date.
@@ -11,8 +9,8 @@ export class DateHandler {
      * @returns {Date} The next date matching the weekday index.
      */
     getExpectedDate(initialDate, weekDayIndex) {
-        let dayOfWeek = initialDate.getDay();
-        let addDays =
+        const dayOfWeek = initialDate.getDay();
+        const addDays =
             dayOfWeek <= weekDayIndex
                 ? weekDayIndex - dayOfWeek
                 : 7 + dayOfWeek - (dayOfWeek - weekDayIndex) - dayOfWeek;
@@ -43,11 +41,10 @@ export class DateHandler {
      * @returns {number} The number of weeks difference.
      */
     weekDifference(startDate, endDate, weekDayIndex) {
-        let weeks = Math.ceil(
+        return Math.ceil(
             (this.startOfWeek(endDate, weekDayIndex).getTime() -
                 this.startOfWeek(startDate, weekDayIndex).getTime()) /
                 this.week
         );
-        return weeks;
     }
 }

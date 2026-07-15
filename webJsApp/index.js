@@ -62,19 +62,21 @@ function loadCliHelp() {
         return 'Help file not found.';
     }
 
-    const markdown = fs.readFileSync(cliHelpPath, 'utf8');
-    return renderMarkdownForConsole(markdown);
+    return renderMarkdownForConsole(fs.readFileSync(cliHelpPath, 'utf8'));
+}
+
+function readRequiredTextFile(filePath, label) {
+    if (!fs.existsSync(filePath)) {
+        throw new Error(`${label} not found: ${filePath}`);
+    }
+
+    return fs.readFileSync(filePath, 'utf8');
 }
 
 function loadProfileConfig(profileKey = defaultProfileKey) {
     const configPath = path.join(workspaceRoot, 'config.json');
 
-    if (!fs.existsSync(configPath)) {
-        throw new Error(`Config file not found: ${configPath}`);
-    }
-
-    const rawConfig = fs.readFileSync(configPath, 'utf8');
-    const rootConfig = JSON.parse(rawConfig);
+    const rootConfig = JSON.parse(readRequiredTextFile(configPath, 'Config file'));
     const profileConfig = rootConfig[profileKey];
 
     if (!profileConfig) {
@@ -136,6 +138,22 @@ function parseBooleanFlag(value) {
     return String(value || '').trim().toLowerCase() === 'y';
 }
 
+function formatErrorDetails(error) {
+    if (error instanceof Error) {
+        return error.stack || error.message;
+    }
+
+    if (typeof error === 'string') {
+        return error;
+    }
+
+    try {
+        return JSON.stringify(error, null, 2);
+    } catch {
+        return String(error);
+    }
+}
+
 function normalizeLookupText(value) {
     return String(value || '')
         .normalize('NFD')
@@ -149,12 +167,7 @@ function normalizeLookupNumber(value) {
 }
 
 function loadScoreEntries() {
-    if (!fs.existsSync(scoreFilePath)) {
-        throw new Error(`Score file not found: ${scoreFilePath}`);
-    }
-
-    const rawScoreFile = fs.readFileSync(scoreFilePath, 'utf8');
-    const scoreData = JSON.parse(rawScoreFile);
+    const scoreData = JSON.parse(readRequiredTextFile(scoreFilePath, 'Score file'));
     const entries = Array.isArray(scoreData.puntuacion) ? scoreData.puntuacion : [];
 
     return {
@@ -190,43 +203,18 @@ function persistMissingScoreEntries(scoreData, missingEntries) {
     fs.writeFileSync(scoreFilePath, `${JSON.stringify(scoreData, null, 4)}\n`, 'utf8');
 }
 
-function resolveSeason(config, requestedSeason) {
+function getConfiguredSeasons(config) {
     const seasons = Array.isArray(config.seasons) ? config.seasons : [];
 
     if (seasons.length === 0) {
         throw new Error('No seasons were found in config.json under "seasons".');
     }
 
-    let seasonToFind = requestedSeason;
-    if (!seasonToFind && config.default) {
-        seasonToFind = config.default;
-    }
-
-    if (!seasonToFind) {
-        return seasons[0];
-    }
-
-    const season = seasons.find(
-        (item) => String(item.season).toLowerCase() === String(seasonToFind).toLowerCase()
-    );
-
-    if (!season) {
-        throw new Error(
-            `Season "${seasonToFind}" not found. Available seasons: ${seasons
-                .map((item) => item.season)
-                .join(', ')}`
-        );
-    }
-
-    return season;
+    return seasons;
 }
 
 function resolveSeasonIndex(config, requestedSeason) {
-    const seasons = Array.isArray(config.seasons) ? config.seasons : [];
-
-    if (seasons.length === 0) {
-        throw new Error('No seasons were found in config.json under "seasons".');
-    }
+    const seasons = getConfiguredSeasons(config);
 
     let seasonToFind = requestedSeason;
     if (!seasonToFind && config.default) {
@@ -295,11 +283,7 @@ function isDateInSeasonRange(dateStr, startDateStr, endDateStr) {
 }
 
 function resolveSeasonByDate(config, playDate) {
-    const seasons = Array.isArray(config.seasons) ? config.seasons : [];
-
-    if (seasons.length === 0) {
-        throw new Error('No seasons were found in config.json under "seasons".');
-    }
+    const seasons = getConfiguredSeasons(config);
 
     const month = String(playDate.getMonth() + 1).padStart(2, '0');
     const day = String(playDate.getDate()).padStart(2, '0');
@@ -325,10 +309,27 @@ function resolveSeasonByDate(config, playDate) {
     return matchingSeason;
 }
 
-function resolveSeasonIndexByDate(config, playDate) {
-    const matchingSeason = resolveSeasonByDate(config, playDate);
-    const seasons = Array.isArray(config.seasons) ? config.seasons : [];
-    return seasons.findIndex((s) => s.season === matchingSeason.season);
+function resolveSeasonSelection(config, playDate, requestedSeason) {
+    const seasonIndex = requestedSeason
+        ? resolveSeasonIndex(config, requestedSeason)
+        : getConfiguredSeasons(config).findIndex(
+            (season) => season.season === resolveSeasonByDate(config, playDate).season
+        );
+
+    return {
+        seasonIndex,
+        season: config.seasons[seasonIndex],
+    };
+}
+
+function getRulesContent() {
+    const reglamentoPath = path.join(workspaceRoot, 'reglamento.md');
+
+    if (!fs.existsSync(reglamentoPath)) {
+        return null;
+    }
+
+    return fs.readFileSync(reglamentoPath, 'utf8');
 }
 
 async function runAutomatedConvocadosFlow(wsaHdl, options = {}) {
@@ -346,12 +347,7 @@ async function runAutomatedConvocadosFlow(wsaHdl, options = {}) {
     }
 
     const messagePath = path.join(workspaceRoot, messageFile);
-
-    if (!fs.existsSync(messagePath)) {
-        throw new Error(`Message file not found: ${messagePath}`);
-    }
-
-    const message = fs.readFileSync(messagePath, 'utf8');
+    const message = readRequiredTextFile(messagePath, 'Message file');
     const groupName = profileConfig.group;
 
     if (!groupName) {
@@ -382,24 +378,14 @@ function getAutomatedConvocatoriaContext(options = {}) {
 
     const messagePath = path.join(workspaceRoot, messageFile);
 
-    if (!fs.existsSync(messagePath)) {
-        throw new Error(`Message file not found: ${messagePath}`);
-    }
-
     //! For testing purposes, we can set a fixed play date. In production, this would likely be the next upcoming Thursday.
     const playDate = getNextThursday(new Date());
     const renderedDate = formatDateForMessage(playDate);
-
-    let seasonIndex;
-    let season;
-
-    if (options.seasonName) {
-        seasonIndex = resolveSeasonIndex(convocatoriaConfig, options.seasonName);
-        season = convocatoriaConfig.seasons[seasonIndex];
-    } else {
-        seasonIndex = resolveSeasonIndexByDate(convocatoriaConfig, playDate);
-        season = convocatoriaConfig.seasons[seasonIndex];
-    }
+    const { seasonIndex, season } = resolveSeasonSelection(
+        convocatoriaConfig,
+        playDate,
+        options.seasonName,
+    );
 
     const variables = {
         DATE: renderedDate,
@@ -413,8 +399,7 @@ function getAutomatedConvocatoriaContext(options = {}) {
         RED_CARDS_PAYMENT: season.RED_CARDS_PAYMENT,
     };
 
-    const convocatoriaTemplate = fs.readFileSync(messagePath, 'utf8');
-    const message = renderTemplate(convocatoriaTemplate, variables);
+    const message = renderTemplate(readRequiredTextFile(messagePath, 'Message file'), variables);
 
     const groupName = profileConfig.group;
     if (!groupName) {
@@ -475,14 +460,11 @@ async function runAutomatedConvocatoriaFlow(wsaHdl, options = {}) {
 
     console.log('\nMessage to send:\n');
     console.log(message);
-    
-    if (season.INCLUDE_RULES) {
-        const reglamentoPath = path.join(workspaceRoot, 'reglamento.md');
-        if (fs.existsSync(reglamentoPath)) {
-            const reglamentoContent = fs.readFileSync(reglamentoPath, 'utf8');
-            console.log('\nRules to send:\n');
-            console.log(reglamentoContent);
-        }
+    const rulesContent = season.INCLUDE_RULES ? getRulesContent() : null;
+
+    if (rulesContent) {
+        console.log('\nRules to send:\n');
+        console.log(rulesContent);
     }
     
     console.log('\nPoll to create:');
@@ -492,15 +474,11 @@ async function runAutomatedConvocatoriaFlow(wsaHdl, options = {}) {
     console.log(`Vote answer(s): ${pollAnswer.join(', ')}\n`);
 
     await wsaHdl.sendMessage(groupName, message);
-    
-    if (season.INCLUDE_RULES) {
-        const reglamentoPath = path.join(workspaceRoot, 'reglamento.md');
-        if (fs.existsSync(reglamentoPath)) {
-            const reglamentoContent = fs.readFileSync(reglamentoPath, 'utf8');
-            await wsaHdl.sendMessage(groupName, reglamentoContent);
-        }
+
+    if (rulesContent) {
+        await wsaHdl.sendMessage(groupName, rulesContent);
     }
-    
+
     await wsaHdl.createPoll(groupName, pollQuestion, pollOptions, {
         allowMultipleAnswers,
     });
@@ -663,7 +641,7 @@ async function createPollFlow(wsaHdl) {
     const optionsRaw = await prompt('Enter poll options (comma-separated): ');
     const allowMultiple = await prompt('Allow multiple answers? (y/n): ');
 
-    const pollOptions = optionsRaw.split(',').map((opt) => opt.trim()).filter(Boolean);
+    const pollOptions = parseOptions(optionsRaw);
 
     if (pollOptions.length < 2) {
         console.error('A poll needs at least 2 options.');
@@ -680,7 +658,7 @@ async function voteOnPollFlow(wsaHdl) {
     const pollName = await prompt('Enter poll question to vote on: ');
     const selectedRaw = await prompt('Enter your vote(s) (comma-separated option text): ');
 
-    const selectedOptions = selectedRaw.split(',').map((opt) => opt.trim()).filter(Boolean);
+    const selectedOptions = parseOptions(selectedRaw);
 
     if (selectedOptions.length === 0) {
         console.error('You must select at least one option.');
@@ -739,7 +717,7 @@ async function main() {
                 throw new Error(`Unknown type: ${args.type}. Supported types: convocados, convocatoria, poll-votes`);
             }
         } catch (error) {
-            console.error(`\nError: ${error.message}`);
+            console.error(`\nError: ${formatErrorDetails(error)}`);
         } finally {
             await new Promise((resolve) => setTimeout(resolve, 3000));
             await wsaHdl.destroy();
@@ -775,7 +753,7 @@ async function main() {
                     console.log('Invalid option. Please select 1-5.');
             }
         } catch (error) {
-            console.error(`Error: ${error.message}`);
+            console.error(`Error: ${formatErrorDetails(error)}`);
         }
     }
 

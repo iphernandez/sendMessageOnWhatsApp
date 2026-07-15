@@ -2,16 +2,13 @@ import * as fs from 'fs';
 import * as path from 'path';
 
 export class FileHandler {
-    constructor() {}
-
     /**
      * Read a file and return its contents as a string.
      * @param {string} filename - The path to the file to read.
      * @returns {string} The file contents.
      */
     readFileToText(filename) {
-        const textFromFile = fs.readFileSync(filename, 'utf8');
-        return textFromFile;
+        return fs.readFileSync(filename, 'utf8');
     }
 
     /**
@@ -22,11 +19,10 @@ export class FileHandler {
      * @returns {string} The text with variables replaced.
      */
     replaceVar(text, varObj) {
-        let result = text;
-        for (const [key, value] of Object.entries(varObj)) {
-            result = result.replaceAll(`{${key}}`, value);
-        }
-        return result;
+        return Object.entries(varObj).reduce(
+            (result, [key, value]) => result.replaceAll(`{${key}}`, value),
+            text,
+        );
     }
 
     /**

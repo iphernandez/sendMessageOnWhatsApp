@@ -1,5 +1,5 @@
 import pkg from 'whatsapp-web.js';
-const { Client, LocalAuth, MessageMedia, Poll } = pkg;
+const { Client, LocalAuth, MessageMedia } = pkg;
 import qrcode from 'qrcode-terminal';
 
 export class WhatsAppHandler {
@@ -8,9 +8,260 @@ export class WhatsAppHandler {
             authStrategy: new LocalAuth(),
             puppeteer: {
                 headless: false,
+                defaultViewport: null,
+                args: [
+                    '--no-first-run',
+                    '--no-default-browser-check',
+                    '--disable-default-apps',
+                    '--disable-session-crashed-bubble',
+                ],
             },
         });
         this.isReady = false;
+    }
+
+    async delay(ms) {
+        await new Promise((resolve) => setTimeout(resolve, ms));
+    }
+
+    formatErrorDetails(error) {
+        if (error instanceof Error) {
+            return error.stack || error.message;
+        }
+
+        if (typeof error === 'string') {
+            return error;
+        }
+
+        try {
+            return JSON.stringify(error, null, 2);
+        } catch {
+            return String(error);
+        }
+    }
+
+    async cleanupExtraPages() {
+        const browser = this.client.pupBrowser;
+        const primaryPage = this.client.pupPage;
+
+        if (!browser || !primaryPage) {
+            return;
+        }
+
+        const pages = await browser.pages();
+        const extraPages = pages.filter((page) => page !== primaryPage && !page.isClosed());
+
+        for (const page of extraPages) {
+            try {
+                await page.close();
+            } catch {
+                // Ignore startup page races while Chromium is still settling.
+            }
+        }
+    }
+
+    async findGroupDescriptor(groupName) {
+        return this.client.pupPage.evaluate((targetGroupName) => {
+            const normalize = (value) => String(value || '')
+                .normalize('NFD')
+                .replace(/[\u0300-\u036f]/g, '')
+                .trim()
+                .toLowerCase();
+
+            const targetName = normalize(targetGroupName);
+            const chats = window.require('WAWebCollections').Chat.getModelsArray();
+
+            const matchedChat = chats.find((chat) => {
+                if (!chat?.groupMetadata) {
+                    return false;
+                }
+
+                const candidates = [chat.name, chat.formattedTitle, chat.groupMetadata?.subject];
+                return candidates.some((candidate) => normalize(candidate) === targetName);
+            });
+
+            if (!matchedChat?.id?._serialized) {
+                return null;
+            }
+
+            return {
+                id: matchedChat.id._serialized,
+                name: matchedChat.formattedTitle || matchedChat.name || matchedChat.groupMetadata?.subject || targetGroupName,
+            };
+        }, groupName);
+    }
+
+    async runGroupCommand(groupId, command, payload = {}) {
+        return this.client.pupPage.evaluate(
+            async (targetGroupId, targetCommand, targetPayload) => {
+                const normalize = (value) => String(value || '')
+                    .normalize('NFD')
+                    .replace(/[\u0300-\u036f]/g, '')
+                    .trim()
+                    .toLowerCase();
+
+                const getChatBySerializedId = (chatId) => {
+                    const wid = window.require('WAWebWidFactory').createWid(chatId);
+
+                    return (
+                        window.require('WAWebCollections').Chat.get(wid) ||
+                        window.require('WAWebCollections').Chat.getModelsArray().find(
+                            (chat) => chat?.id?._serialized === chatId
+                        )
+                    );
+                };
+
+                const getRecentMessages = async (chat, limit) => {
+                    const msgFilter = (msg) => !msg.isNotification;
+                    let messages = chat.msgs.getModelsArray().filter(msgFilter);
+
+                    while (messages.length < limit) {
+                        const loadedMessages = await window
+                            .require('WAWebChatLoadMessages')
+                            .loadEarlierMsgs({ chat });
+
+                        if (!loadedMessages || !loadedMessages.length) {
+                            break;
+                        }
+
+                        messages = [...loadedMessages.filter(msgFilter), ...messages];
+                    }
+
+                    if (messages.length > limit) {
+                        messages.sort((a, b) => (a.t > b.t ? 1 : -1));
+                        messages = messages.splice(messages.length - limit);
+                    }
+
+                    return messages;
+                };
+
+                const chat = getChatBySerializedId(targetGroupId);
+                if (!chat) {
+                    throw new Error(`Group chat with id "${targetGroupId}" is not available.`);
+                }
+
+                if (targetCommand === 'sendSeen') {
+                    window.require('WAWebStreamModel').Stream.markAvailable();
+                    await window.require('WAWebUpdateUnreadChatAction').sendSeen({
+                        chat,
+                        threadId: undefined,
+                    });
+                    window.require('WAWebStreamModel').Stream.markUnavailable();
+                    return true;
+                }
+
+                if (targetCommand === 'sendTextMessage') {
+                    const msg = await window.WWebJS.sendMessage(chat, targetPayload.message, {
+                        linkPreview: true,
+                        parseVCards: true,
+                    });
+                    return msg ? window.WWebJS.getMessageModel(msg) : null;
+                }
+
+                if (targetCommand === 'sendMediaMessage') {
+                    const msg = await window.WWebJS.sendMessage(chat, '', {
+                        media: targetPayload.media,
+                        caption: targetPayload.caption,
+                    });
+                    return msg ? window.WWebJS.getMessageModel(msg) : null;
+                }
+
+                if (targetCommand === 'createPoll') {
+                    const pollOptions = (targetPayload.pollOptions || []).map((option, index) => ({
+                        name: String(option || '').trim(),
+                        localId: index,
+                    }));
+
+                    const msg = await window.WWebJS.sendMessage(chat, '', {
+                        poll: {
+                            pollName: targetPayload.pollName,
+                            pollOptions,
+                            options: {
+                                allowMultipleAnswers: targetPayload.allowMultipleAnswers,
+                            },
+                        },
+                    });
+                    return msg ? window.WWebJS.getMessageModel(msg) : null;
+                }
+
+                if (targetCommand === 'findPollMessage') {
+                    const messageLimit = Number(targetPayload.messageLimit) || 50;
+                    const targetPollName = normalize(targetPayload.pollName);
+                    const messages = await getRecentMessages(chat, messageLimit);
+
+                    const pollMessage = [...messages]
+                        .sort((a, b) => (a.t < b.t ? 1 : -1))
+                        .find(
+                            (msg) =>
+                                msg.type === 'poll_creation' &&
+                                normalize(msg.body) === targetPollName
+                        );
+
+                    return pollMessage ? window.WWebJS.getMessageModel(pollMessage) : null;
+                }
+
+                throw new Error(`Unsupported group command: ${targetCommand}`);
+            },
+            groupId,
+            command,
+            payload,
+        );
+    }
+
+    async ensureChatReady(group) {
+        await this.runGroupCommand(group.id, 'sendSeen');
+        await this.delay(2000);
+    }
+
+    async getReadyGroup(groupName) {
+        const group = await this.findGroup(groupName);
+        await this.ensureChatReady(group);
+        return group;
+    }
+
+    async findPollMessage(group, pollName, messageLimit = 50) {
+        return this.runGroupCommand(group.id, 'findPollMessage', {
+            pollName,
+            messageLimit,
+        });
+    }
+
+    async voteOnMessage(messageId, selectedOptions) {
+        await this.client.pupPage.evaluate(
+            async (targetMessageId, votes) => {
+                if (!targetMessageId) {
+                    return null;
+                }
+
+                const selectedVotes = Array.isArray(votes) ? votes : [votes];
+                const localIdSet = new Set();
+                const msg =
+                    window.require('WAWebCollections').Msg.get(targetMessageId) ||
+                    (
+                        await window
+                            .require('WAWebCollections')
+                            .Msg.getMessagesById([targetMessageId])
+                    )?.messages?.[0];
+
+                if (!msg) {
+                    throw new Error(`Poll message "${targetMessageId}" could not be loaded.`);
+                }
+
+                msg.pollOptions.forEach((option) => {
+                    for (const vote of selectedVotes) {
+                        if (option.name === vote) {
+                            localIdSet.add(option.localId);
+                        }
+                    }
+                });
+
+                await window
+                    .require('WAWebPollsSendVoteMsgAction')
+                    .sendVote(msg, localIdSet);
+            },
+            messageId,
+            selectedOptions,
+        );
     }
 
     normalizeText(value) {
@@ -68,7 +319,9 @@ export class WhatsAppHandler {
             this.client.on('ready', () => {
                 console.log('WhatsApp client is ready!');
                 this.isReady = true;
-                resolve();
+                this.cleanupExtraPages()
+                    .catch(() => {})
+                    .finally(resolve);
             });
 
             this.client.initialize();
@@ -85,19 +338,16 @@ export class WhatsAppHandler {
      */
     async findGroup(groupName, retries = 5, delayMs = 3000) {
         for (let attempt = 1; attempt <= retries; attempt++) {
-            const chats = await this.client.getChats();
-            const group = chats.find(
-                (chat) => chat.isGroup && chat.name === groupName
-            );
+            const group = await this.findGroupDescriptor(groupName);
 
             if (group) {
-                console.log(`Found group: "${group.name}" (${group.id._serialized})`);
+                console.log(`Found group: "${group.name}" (${group.id})`);
                 return group;
             }
 
             if (attempt < retries) {
                 console.log(`Group "${groupName}" not found yet, retrying in ${delayMs / 1000}s... (${attempt}/${retries})`);
-                await new Promise((resolve) => setTimeout(resolve, delayMs));
+                await this.delay(delayMs);
             }
         }
 
@@ -111,9 +361,17 @@ export class WhatsAppHandler {
      * @returns {Promise<void>}
      */
     async sendMessage(groupName, message) {
-        const group = await this.findGroup(groupName);
-        await group.sendMessage(message);
-        await new Promise((resolve) => setTimeout(resolve, 3000));
+        const group = await this.getReadyGroup(groupName);
+
+        try {
+            await this.runGroupCommand(group.id, 'sendTextMessage', { message });
+        } catch (error) {
+            console.error(`Failed to send message to group "${groupName}":`);
+            console.error(this.formatErrorDetails(error));
+            throw error;
+        }
+
+        await this.delay(3000);
         console.log(`Message sent to group "${groupName}".`);
     }
 
@@ -125,10 +383,10 @@ export class WhatsAppHandler {
      * @returns {Promise<void>}
      */
     async sendPicture(groupName, filePath, caption = '') {
-        const group = await this.findGroup(groupName);
+        const group = await this.getReadyGroup(groupName);
         const media = MessageMedia.fromFilePath(filePath);
-        await group.sendMessage(media, { caption });
-        await new Promise((resolve) => setTimeout(resolve, 3000));
+        await this.runGroupCommand(group.id, 'sendMediaMessage', { media, caption });
+        await this.delay(3000);
         console.log(`Picture "${filePath}" sent to group "${groupName}".`);
     }
 
@@ -142,15 +400,15 @@ export class WhatsAppHandler {
      * @returns {Promise<object>} The sent message object.
      */
     async createPoll(groupName, pollName, pollOptions, options = {}) {
-        const group = await this.findGroup(groupName);
+        const group = await this.getReadyGroup(groupName);
         const { allowMultipleAnswers = false } = options;
 
-        const poll = new Poll(pollName, pollOptions, {
+        const sentMessage = await this.runGroupCommand(group.id, 'createPoll', {
+            pollName,
+            pollOptions,
             allowMultipleAnswers,
         });
-
-        const sentMessage = await group.sendMessage(poll);
-        await new Promise((resolve) => setTimeout(resolve, 3000));
+        await this.delay(3000);
         console.log(`Poll "${pollName}" created in group "${groupName}".`);
         return sentMessage;
     }
@@ -164,23 +422,8 @@ export class WhatsAppHandler {
      * @returns {Promise<void>}
      */
     async voteOnPoll(groupName, pollName, selectedOptions) {
-        const group = await this.findGroup(groupName);
-
-        // Open the chat so WhatsApp Web loads the chat object internally.
-        // Without this, PollsSendVote.sendVote fails with
-        // "Cannot read properties of undefined (reading 'waitForChatLoading')".
-        await group.sendSeen();
-        await new Promise((resolve) => setTimeout(resolve, 2000));
-
-        // Fetch recent messages to find the poll
-        const messages = await group.fetchMessages({ limit: 50 });
-        const pollMessage = messages
-            .reverse()
-            .find(
-                (msg) =>
-                    msg.type === 'poll_creation' &&
-                    msg.body === pollName
-            );
+        const group = await this.getReadyGroup(groupName);
+        const pollMessage = await this.findPollMessage(group, pollName, 50);
 
         if (!pollMessage) {
             throw new Error(
@@ -188,8 +431,7 @@ export class WhatsAppHandler {
             );
         }
 
-        // Vote on the poll
-        await pollMessage.vote(selectedOptions);
+        await this.voteOnMessage(pollMessage.id._serialized, selectedOptions);
         console.log(
             `Voted on poll "${pollName}" with options: [${selectedOptions.join(', ')}]`
         );
@@ -209,18 +451,11 @@ export class WhatsAppHandler {
             messageLimit = 100,
         } = options;
 
-        const group = await this.findGroup(groupName);
+        const group = await this.getReadyGroup(groupName);
 
         let pollMessage = null;
         for (let attempt = 1; attempt <= retries; attempt += 1) {
-            const messages = await group.fetchMessages({ limit: messageLimit });
-            pollMessage = messages
-                .reverse()
-                .find(
-                    (msg) =>
-                        msg.type === 'poll_creation' &&
-                        this.normalizeText(msg.body) === this.normalizeText(pollName)
-                );
+            pollMessage = await this.findPollMessage(group, pollName, messageLimit);
 
             if (pollMessage) {
                 break;
@@ -230,7 +465,7 @@ export class WhatsAppHandler {
                 console.log(
                     `Poll "${pollName}" not found yet, retrying in ${delayMs / 1000}s... (${attempt}/${retries})`
                 );
-                await new Promise((resolve) => setTimeout(resolve, delayMs));
+                await this.delay(delayMs);
             }
         }
 
@@ -240,9 +475,7 @@ export class WhatsAppHandler {
             );
         }
 
-        const votes = typeof pollMessage.getPollVotes === 'function'
-            ? await pollMessage.getPollVotes()
-            : (pollMessage.votes ?? []);
+        const votes = await this.client.getPollVotes(pollMessage.id._serialized);
 
         if (votes.length === 0) {
             console.log(`No votes found for poll "${pollName}".`);
