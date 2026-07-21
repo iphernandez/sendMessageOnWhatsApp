@@ -479,10 +479,12 @@ async function runAutomatedConvocatoriaFlow(wsaHdl, options = {}) {
         await wsaHdl.sendMessage(groupName, rulesContent);
     }
 
-    await wsaHdl.createPoll(groupName, pollQuestion, pollOptions, {
+    const createdPoll = await wsaHdl.createPoll(groupName, pollQuestion, pollOptions, {
         allowMultipleAnswers,
     });
-    await wsaHdl.voteOnPoll(groupName, pollQuestion, pollAnswer);
+    await wsaHdl.voteOnPoll(groupName, pollQuestion, pollAnswer, {
+        pollMessageId: createdPoll?.id?._serialized,
+    });
 
     const currentWeekNumber = Number(convocatoriaConfig.seasons[seasonIndex].WEEK_NUMBER);
     if (!Number.isFinite(currentWeekNumber)) {

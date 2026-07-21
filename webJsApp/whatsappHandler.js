@@ -272,6 +272,26 @@ export class WhatsAppHandler {
             .toLowerCase();
     }
 
+    getSerializedMessageId(message) {
+        if (!message) {
+            return null;
+        }
+
+        if (typeof message.id === 'string') {
+            return message.id;
+        }
+
+        if (message.id && typeof message.id._serialized === 'string') {
+            return message.id._serialized;
+        }
+
+        if (typeof message._serialized === 'string') {
+            return message._serialized;
+        }
+
+        return null;
+    }
+
     async resolveVoterContact(voterRef) {
         if (!voterRef) {
             return null;
@@ -414,24 +434,59 @@ export class WhatsAppHandler {
     }
 
     /**
-     * Vote on a poll in a WhatsApp group by finding the most recent poll
-     * with the given title and selecting specified options.
+     * Vote on a poll in a WhatsApp group.
+     * If a poll message id is provided, it is used directly. Otherwise,
+     * the method searches recent messages by poll title with retries.
      * @param {string} groupName - The target group name.
      * @param {string} pollName - The poll question/title to search for.
      * @param {string[]} selectedOptions - Array of option strings to vote for.
+     * @param {object} [options] - Optional vote settings.
+     * @param {string} [options.pollMessageId] - Specific poll message id to vote on.
+     * @param {number} [options.retries=5] - Lookup attempts when pollMessageId is not provided.
+     * @param {number} [options.delayMs=2000] - Delay between lookup attempts.
+     * @param {number} [options.messageLimit=100] - Number of recent messages to scan.
      * @returns {Promise<void>}
      */
-    async voteOnPoll(groupName, pollName, selectedOptions) {
-        const group = await this.getReadyGroup(groupName);
-        const pollMessage = await this.findPollMessage(group, pollName, 50);
+    async voteOnPoll(groupName, pollName, selectedOptions, options = {}) {
+        const {
+            pollMessageId = null,
+            retries = 5,
+            delayMs = 2000,
+            messageLimit = 100,
+        } = options;
 
-        if (!pollMessage) {
+        const group = await this.getReadyGroup(groupName);
+        let targetMessageId = String(pollMessageId || '').trim();
+
+        if (!targetMessageId) {
+            let pollMessage = null;
+
+            for (let attempt = 1; attempt <= retries; attempt += 1) {
+                pollMessage = await this.findPollMessage(group, pollName, messageLimit);
+
+                if (pollMessage) {
+                    targetMessageId = this.getSerializedMessageId(pollMessage) || '';
+                    if (targetMessageId) {
+                        break;
+                    }
+                }
+
+                if (attempt < retries) {
+                    console.log(
+                        `Poll "${pollName}" not found yet, retrying in ${delayMs / 1000}s... (${attempt}/${retries})`
+                    );
+                    await this.delay(delayMs);
+                }
+            }
+        }
+
+        if (!targetMessageId) {
             throw new Error(
-                `Poll "${pollName}" not found in recent messages of group "${groupName}".`
+                `Poll "${pollName}" not found in recent messages of group "${groupName}" after ${retries} attempts.`
             );
         }
 
-        await this.voteOnMessage(pollMessage.id._serialized, selectedOptions);
+        await this.voteOnMessage(targetMessageId, selectedOptions);
         console.log(
             `Voted on poll "${pollName}" with options: [${selectedOptions.join(', ')}]`
         );
