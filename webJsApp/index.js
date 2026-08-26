@@ -670,6 +670,24 @@ async function voteOnPollFlow(wsaHdl) {
     await wsaHdl.voteOnPoll(groupName, pollName, selectedOptions);
 }
 
+async function getPollVotersFlow(wsaHdl) {
+    const groupName = await prompt('Enter group name: ');
+    const pollName = await prompt('Enter poll question: ');
+    const optionText = await prompt('Enter option to get voters for: ');
+
+    const voters = await wsaHdl.getPollOptionVoters(groupName, pollName, optionText);
+
+    if (voters.length === 0) {
+        console.log('No voters found for that option.');
+        return;
+    }
+
+    console.log(`\nVoters for "${optionText}":`);
+    for (const voter of voters) {
+        console.log(`- ${voter.name} (${voter.number})`);
+    }
+}
+
 function showMenu() {
     console.log('\n========================================');
     console.log('  WhatsApp Group Chat - Web.js App');
@@ -678,7 +696,8 @@ function showMenu() {
     console.log('  2. Send a picture');
     console.log('  3. Create a poll');
     console.log('  4. Vote on a poll');
-    console.log('  5. Exit');
+    console.log('  5. Get poll voters');
+    console.log('  6. Exit');
     console.log('========================================\n');
 }
 
@@ -732,7 +751,7 @@ async function main() {
     let running = true;
     while (running) {
         showMenu();
-        const choice = await prompt('Select an option (1-5): ');
+        const choice = await prompt('Select an option (1-6): ');
 
         try {
             switch (choice.trim()) {
@@ -749,10 +768,13 @@ async function main() {
                     await voteOnPollFlow(wsaHdl);
                     break;
                 case '5':
+                    await getPollVotersFlow(wsaHdl);
+                    break;
+                case '6':
                     running = false;
                     break;
                 default:
-                    console.log('Invalid option. Please select 1-5.');
+                    console.log('Invalid option. Please select 1-6.');
             }
         } catch (error) {
             console.error(`Error: ${formatErrorDetails(error)}`);

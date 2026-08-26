@@ -9,12 +9,7 @@ export class DateHandler {
      * @returns {Date} The next date matching the weekday index.
      */
     getExpectedDate(initialDate, weekDayIndex) {
-        const dayOfWeek = initialDate.getDay();
-        const addDays =
-            dayOfWeek <= weekDayIndex
-                ? weekDayIndex - dayOfWeek
-                : 7 + dayOfWeek - (dayOfWeek - weekDayIndex) - dayOfWeek;
-
+        const addDays = (weekDayIndex - initialDate.getDay() + 7) % 7;
         initialDate.setDate(initialDate.getDate() + addDays);
         return initialDate;
     }

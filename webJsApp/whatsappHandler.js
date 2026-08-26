@@ -8,6 +8,7 @@ export class WhatsAppHandler {
             authStrategy: new LocalAuth(),
             puppeteer: {
                 headless: false,
+                devtools: true,
                 defaultViewport: null,
                 args: [
                     '--no-first-run',
@@ -99,7 +100,6 @@ export class WhatsAppHandler {
                     .replace(/[\u0300-\u036f]/g, '')
                     .trim()
                     .toLowerCase();
-
                 const getChatBySerializedId = (chatId) => {
                     const wid = window.require('WAWebWidFactory').createWid(chatId);
 
@@ -184,6 +184,97 @@ export class WhatsAppHandler {
                     return msg ? window.WWebJS.getMessageModel(msg) : null;
                 }
 
+                if (targetCommand === 'getPollVoters') {
+                    const messageLimit = Number(targetPayload.messageLimit) || 100;
+                    const targetPollName = normalize(targetPayload.pollName);
+                    const messages = await getRecentMessages(chat, messageLimit);
+
+                    debugger; // Pause here for debugging in the browser console if needed
+                    const pollMessage = [...messages]
+                        .sort((a, b) => (a.t < b.t ? 1 : -1))
+                        .find(
+                            (msg) =>
+                                msg.type === 'poll_creation' &&
+                                normalize(msg.pollName || msg.body) === targetPollName
+                        );
+
+                    if (!pollMessage) return null;
+
+                    // Build localId → option name map from the live message object
+                    const optionMap = new Map();
+                    const pollOpts = pollMessage.pollOptions || pollMessage.attributes?.pollOptions || [];
+                    pollOpts.forEach((opt) => {
+                        optionMap.set(opt.localId, opt.name);
+                    });
+
+                    // String(pollMessage.id) calls the live MsgKey.toString() which includes participant
+                    // for group messages: "fromMe_remote_id_participant" (4 parts)
+                    const rawIdStr = typeof pollMessage.id === 'string'
+                        ? pollMessage.id
+                        : String(pollMessage.id);
+                    const serializedId = rawIdStr.includes('_') ? rawIdStr : null;
+                    if (!serializedId) {
+                        throw new Error(`Cannot determine ID for poll "${targetPollName}".`);
+                    }
+
+                    const WAWebMsgKey = window.require('WAWebMsgKey');
+                    const table = window.require('WAWebPollsVotesSchema').getTable();
+                    let rawVotes = [];
+
+                    // WA group msg key is 4-part (includes participant); also derive 3-part (_serialized form)
+                    const threePart = serializedId.split('_').slice(0, 3).join('_');
+
+                    for (const key of [serializedId, threePart]) {
+                        if (rawVotes.length) break;
+                        try {
+                            const mk = WAWebMsgKey.fromString(key);
+                            rawVotes = await table.equals(['parentMsgKey'], mk.toString()) || [];
+                        } catch {}
+                        if (!rawVotes.length) {
+                            try { rawVotes = await table.equals(['parentMsgKey'], key) || []; } catch {}
+                        }
+                        // WA internally uses pollUpdateParentKey as field name
+                        if (!rawVotes.length) {
+                            try { rawVotes = await table.equals(['pollUpdateParentKey'], key) || []; } catch {}
+                        }
+                    }
+
+                    // Full table scan via getView_TESTONLY (bypasses index lookup)
+                    if (!rawVotes.length) {
+                        try {
+                            const view = typeof table.getView_TESTONLY === 'function'
+                                ? table.getView_TESTONLY() : null;
+                            if (view && typeof view.toArray === 'function') {
+                                const hexPart = threePart.split('_')[2];
+                                const all = await view.toArray();
+                                rawVotes = all.filter((v) => {
+                                    const pk = String(v.parentMsgKey ?? v.pollUpdateParentKey ?? '');
+                                    return pk.includes(hexPart);
+                                });
+                                if (!rawVotes.length && all.length > 0) {
+                                    // Show structure of first record so we know the real field/key format
+                                    throw new Error(
+                                        `Table has ${all.length} record(s) but none match hexPart="${hexPart}". ` +
+                                        `keys=[${Object.keys(all[0]).join(',')}] ` +
+                                        `parentMsgKey="${String(all[0]?.parentMsgKey ?? '').slice(0, 100)}"`
+                                    );
+                                }
+                            }
+                        } catch (e) {
+                            if (String(e.message).startsWith('Table has')) throw e;
+                        }
+                    }
+
+                    if (!rawVotes.length) return [];
+
+                    return rawVotes.map((vote) => {
+                        const localIds = Array.from(new Uint8Array(vote.selectedOptionLocalIds));
+                        const selectedOptions = localIds.map((id) => optionMap.get(id) || '');
+                        const voter = vote.sender?._serialized ?? String(vote.sender ?? '');
+                        return { voter, selectedOptions };
+                    });
+                }
+
                 if (targetCommand === 'findPollMessage') {
                     const messageLimit = Number(targetPayload.messageLimit) || 50;
                     const targetPollName = normalize(targetPayload.pollName);
@@ -194,10 +285,24 @@ export class WhatsAppHandler {
                         .find(
                             (msg) =>
                                 msg.type === 'poll_creation' &&
-                                normalize(msg.body) === targetPollName
+                                normalize(msg.pollName || msg.body) === targetPollName
                         );
 
-                    return pollMessage ? window.WWebJS.getMessageModel(pollMessage) : null;
+                    if (!pollMessage) return null;
+                    const model = window.WWebJS.getMessageModel(pollMessage);
+                    // _serialized is a getter on WA's MsgKey and is dropped by JSON serialization
+                    if (model?.id && typeof model.id === 'object') {
+                        const rawId = pollMessage.id;
+                        let serialized = typeof rawId === 'string'
+                            ? rawId
+                            : rawId?._serialized;
+                        if (!serialized && rawId?.fromMe !== undefined && rawId?.remote && rawId?.id) {
+                            const remote = typeof rawId.remote === 'object' ? rawId.remote._serialized : rawId.remote;
+                            serialized = `${rawId.fromMe}_${remote}_${rawId.id}`;
+                        }
+                        model.id._serialized = serialized;
+                    }
+                    return model;
                 }
 
                 throw new Error(`Unsupported group command: ${targetCommand}`);
@@ -507,55 +612,42 @@ export class WhatsAppHandler {
         } = options;
 
         const group = await this.getReadyGroup(groupName);
+        let rawVotes = null;
 
-        let pollMessage = null;
         for (let attempt = 1; attempt <= retries; attempt += 1) {
-            pollMessage = await this.findPollMessage(group, pollName, messageLimit);
-
-            if (pollMessage) {
-                break;
-            }
-
+            rawVotes = await this.runGroupCommand(group.id, 'getPollVoters', { pollName, messageLimit });
+            if (rawVotes !== null) break;
             if (attempt < retries) {
-                console.log(
-                    `Poll "${pollName}" not found yet, retrying in ${delayMs / 1000}s... (${attempt}/${retries})`
-                );
+                console.log(`Poll "${pollName}" not found yet, retrying in ${delayMs / 1000}s... (${attempt}/${retries})`);
                 await this.delay(delayMs);
             }
         }
 
-        if (!pollMessage) {
+        if (rawVotes === null) {
             throw new Error(
                 `Poll "${pollName}" not found in recent messages of group "${groupName}" after ${retries} attempts.`
             );
         }
 
-        const votes = await this.client.getPollVotes(pollMessage.id._serialized);
-
-        if (votes.length === 0) {
+        if (rawVotes.length === 0) {
             console.log(`No votes found for poll "${pollName}".`);
             return [];
         }
 
         const voters = [];
-        for (const vote of votes) {
-            const selectedNames = (vote.selectedOptions ?? []).map((opt) =>
-                typeof opt === 'string' ? opt : String(opt.name ?? '')
-            );
-
-            const matchedOption = selectedNames.some(
-                (selectedName) => this.normalizeText(selectedName) === this.normalizeText(optionText)
+        for (const vote of rawVotes) {
+            const matchedOption = (vote.selectedOptions ?? []).some(
+                (name) => this.normalizeText(name) === this.normalizeText(optionText)
             );
 
             if (matchedOption) {
                 const contact = await this.resolveVoterContact(vote.voter);
-                if (!contact) {
-                    continue;
+                if (contact) {
+                    voters.push({
+                        name: contact.pushname || contact.name || contact.number,
+                        number: contact.number,
+                    });
                 }
-                voters.push({
-                    name: contact.pushname || contact.name || contact.number,
-                    number: contact.number,
-                });
             }
         }
 
