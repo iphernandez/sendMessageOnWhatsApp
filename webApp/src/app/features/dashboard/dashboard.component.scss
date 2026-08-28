@@ -1,0 +1,15 @@
+.standings {
+  width: 100%;
+  border-collapse: collapse;
+
+  th,
+  td {
+    text-align: left;
+    padding: 0.5rem 0.75rem;
+    border-bottom: 1px solid #dde3e8;
+  }
+
+  th {
+    background: #f2f6f4;
+  }
+}

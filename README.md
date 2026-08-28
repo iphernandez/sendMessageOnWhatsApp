@@ -1,6 +1,16 @@
 # sendMessageOnWhatsApp
 Sends message to a contact or group on WhatsApp
 
+## FFCH Puntuación (Angular web app)
+
+`webApp/` is an Angular web app that replaces `FFCH_Puntuacion/FFCH - Puntuacion.xlsx`: weekly
+attendance/payment capture, points/TDP calculation, team balancing, and convocatoria text generation.
+It runs entirely client-side (IndexedDB, no server) and is published free on GitHub Pages:
+
+- Live app: `https://iphernandez.github.io/sendMessageOnWhatsApp/` (once deployed, see [webApp/DEPLOY.md](webApp/DEPLOY.md))
+- Local dev / docs: [webApp/README.md](webApp/README.md)
+- Data/formula migration notes: [FFCH_Puntuacion/README.md](FFCH_Puntuacion/README.md)
+
 ## Web JS CLI help
 
 The Web.js entrypoint now supports a built-in help option:

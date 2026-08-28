@@ -1,0 +1,9 @@
+# FFCH - Puntuacion - 2026 Puntos.csv
+- Column "TDP": =VLOOKUP(A6,"FFCH - Puntuacion - TDP.csv"!A:C,3,FALSE)
+- Column "Pts": = if ( "RSVP"=1, if ( "Jugo"=1, if ( "Sede"=1, 5, 3), if ( "Sede"=1, 1, -3 ) ), if ("Jugo"=1,if("Sede"=1, -1, -2 ), if("Sede"=1, 7, 0 ) ) )
+- Column "PtosFecha" : =if("Jugo"=0,"Pts","Pts"*"Pago")
+- Columna "Puntos": = (1+"TDP")*sum(Todas las columnas "PtosFecha)
+- Columna "PtsTemporadaAnterior": =if(SedeTemporadaAnterior=1, 7, 0 )
+
+# FFCH - Puntuacion - TDP.csv
+- Column "TDP": =sum(D3:S3)*$B$49+sum(T3:AB3)*$B$50+sum(AC3:AJ3)*$B$51+sum(AK3)*$B$52+sum(AL3:AM3)*$B$53+sum(AN3:AO3)*$B$54+sum(AP3:AQ3)*$B$54

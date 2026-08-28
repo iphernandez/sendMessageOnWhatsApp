@@ -1,0 +1,42 @@
+<h1>Balanceador de equipos</h1>
+
+<p>Selecciona los jugadores confirmados (RSVP) para la próxima fecha.</p>
+
+<ul class="candidates">
+  @for (candidate of candidates(); track candidate.playerId) {
+    <li>
+      <label>
+        <input type="checkbox" [(ngModel)]="candidate.selected" />
+        {{ candidate.nombre }} ({{ candidate.puntos.toFixed(2) }})
+      </label>
+    </li>
+  }
+</ul>
+
+<button type="button" (click)="buildTeams()">Armar equipos</button>
+
+@if (teams(); as t) {
+  <div class="teams">
+    <div class="team">
+      <h2>🟧 Equipo A</h2>
+      <ul>
+        @for (p of t.teamA.players; track p.playerId) {
+          <li>{{ p.nombre }} ({{ p.puntos.toFixed(0) }})</li>
+        }
+      </ul>
+      <p>Total {{ t.teamA.total.toFixed(0) }} | Prom {{ t.teamA.promedio.toFixed(2) }}</p>
+    </div>
+    <div class="team">
+      <h2>🔵 Equipo B</h2>
+      <ul>
+        @for (p of t.teamB.players; track p.playerId) {
+          <li>{{ p.nombre }} ({{ p.puntos.toFixed(0) }})</li>
+        }
+      </ul>
+      <p>Total {{ t.teamB.total.toFixed(0) }} | Prom {{ t.teamB.promedio.toFixed(2) }}</p>
+    </div>
+  </div>
+
+  <button type="button" (click)="copyToClipboard()">Copiar texto para WhatsApp</button>
+  <pre class="preview">{{ copyText() }}</pre>
+}

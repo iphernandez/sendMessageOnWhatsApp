@@ -1,0 +1,33 @@
+<h1>Tabla de posiciones</h1>
+
+@if (loading()) {
+  <p>Cargando...</p>
+} @else if (sortedRows().length === 0) {
+  <p>
+    No hay jugadores todavía. Ve a <a routerLink="/ajustes">Ajustes</a> para importar los CSV originales o
+    <a routerLink="/roster">agregar jugadores</a>.
+  </p>
+} @else {
+  <table class="standings">
+    <thead>
+      <tr>
+        <th>#</th>
+        <th>Galáctico</th>
+        <th>Apodo</th>
+        <th>TDP %</th>
+        <th>Puntos</th>
+      </tr>
+    </thead>
+    <tbody>
+      @for (row of sortedRows(); track row.playerId; let i = $index) {
+        <tr>
+          <td>{{ i + 1 }}</td>
+          <td>{{ row.galactico }}</td>
+          <td>{{ row.bullying }}</td>
+          <td>{{ (row.summary.tdp * 100).toFixed(0) }}%</td>
+          <td>{{ row.summary.puntos.toFixed(2) }}</td>
+        </tr>
+      }
+    </tbody>
+  </table>
+}

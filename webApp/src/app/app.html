@@ -1,0 +1,15 @@
+<header class="topbar">
+  <span class="brand">⚽ {{ title() }}</span>
+  <nav>
+    <a routerLink="/" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }">Dashboard</a>
+    <a routerLink="/roster" routerLinkActive="active">Roster</a>
+    <a routerLink="/captura" routerLinkActive="active">Captura Semanal</a>
+    <a routerLink="/equipos" routerLinkActive="active">Equipos</a>
+    <a routerLink="/convocatoria" routerLinkActive="active">Convocatoria</a>
+    <a routerLink="/ajustes" routerLinkActive="active">Ajustes</a>
+  </nav>
+</header>
+
+<main class="content">
+  <router-outlet />
+</main>

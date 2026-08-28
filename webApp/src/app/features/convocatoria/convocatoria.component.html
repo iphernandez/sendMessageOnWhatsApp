@@ -1,0 +1,34 @@
+<h1>Generador de convocatoria</h1>
+
+<div class="form-grid">
+  <label>
+    Fecha (para tarjetas)
+    <select [ngModel]="selectedFecha()" (ngModelChange)="onFechaChange($event)">
+      @for (fecha of fechas(); track fecha) {
+        <option [value]="fecha">{{ fecha }}</option>
+      }
+    </select>
+  </label>
+  <label>DATE <input type="text" [(ngModel)]="vars().DATE" /></label>
+  <label>TIME <input type="text" [(ngModel)]="vars().TIME" /></label>
+  <label>LOCATION <input type="text" [(ngModel)]="vars().LOCATION" /></label>
+  <label>LOCATION_URL <input type="text" [(ngModel)]="vars().LOCATION_URL" /></label>
+  <label>SEASON <input type="text" [(ngModel)]="vars().SEASON" /></label>
+  <label>WEEK_NUMBER <input type="number" [(ngModel)]="vars().WEEK_NUMBER" /></label>
+</div>
+
+<p class="hint">
+  Tarjetas calculadas para {{ selectedFecha() }}: 🟨 {{ cardCounts().yellow }} · 🟥 tarde {{ cardCounts().redLate }} · 🟥
+  no pago {{ cardCounts().redPayment }}
+</p>
+
+<h2>Plantilla</h2>
+<textarea rows="14" [ngModel]="template()" (ngModelChange)="template.set($event)"></textarea>
+
+<button type="button" (click)="render()">Generar</button>
+
+@if (rendered()) {
+  <h2>Resultado</h2>
+  <button type="button" (click)="copyToClipboard()">Copiar</button>
+  <pre class="preview">{{ rendered() }}</pre>
+}

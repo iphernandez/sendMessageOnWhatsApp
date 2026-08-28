@@ -1,0 +1,19 @@
+{
+  "players": [],
+  "weeklyRecords": [],
+  "tdpHistory": [],
+  "seasonConfig": {
+    "id": "default",
+    "ptsTemporadaAnteriorIncludedInSum": true,
+    "weights": {
+      "anualidad": 0.02,
+      "pretemporada": 0.01,
+      "gala": 0.01,
+      "socioFundador": 0.02,
+      "partidoPavo": 0.01,
+      "anfitrionGala": 0.01,
+      "teamBuilding": 0.01
+    }
+  },
+  "updatedAt": "2026-08-26T00:00:00.000Z"
+}
