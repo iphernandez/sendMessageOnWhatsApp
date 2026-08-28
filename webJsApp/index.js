@@ -548,6 +548,25 @@ async function runAutomatedPollVotesFlow(wsaHdl, options = {}) {
     }
 }
 
+async function runAutomatedGroupMembersFlow(wsaHdl, options = {}) {
+    const { profileConfig, profileKey } = loadProfileConfig(options.profileKey);
+    const groupName = profileConfig.group;
+
+    if (!groupName) {
+        throw new Error(`"group" was not found in config.json under "${profileKey}".`);
+    }
+
+    const members = await wsaHdl.getGroupParticipants(groupName);
+    printGroupMembers(groupName, members);
+}
+
+function printGroupMembers(groupName, members) {
+    console.log(`\nMembers of "${groupName}" (${members.length}):`);
+    for (const member of members) {
+        console.log(`- ${member.name} (${member.number})${member.isAdmin ? ' [admin]' : ''}`);
+    }
+}
+
 function parseCliArgs(argv) {
     const args = {
         auto: false,
@@ -688,6 +707,12 @@ async function getPollVotersFlow(wsaHdl) {
     }
 }
 
+async function getGroupMembersFlow(wsaHdl) {
+    const groupName = await prompt('Enter group name: ');
+    const members = await wsaHdl.getGroupParticipants(groupName);
+    printGroupMembers(groupName, members);
+}
+
 function showMenu() {
     console.log('\n========================================');
     console.log('  WhatsApp Group Chat - Web.js App');
@@ -697,7 +722,8 @@ function showMenu() {
     console.log('  3. Create a poll');
     console.log('  4. Vote on a poll');
     console.log('  5. Get poll voters');
-    console.log('  6. Exit');
+    console.log('  6. Get group members');
+    console.log('  7. Exit');
     console.log('========================================\n');
 }
 
@@ -734,8 +760,12 @@ async function main() {
                     seasonName: args.seasonName,
                     pollQuestion: args.pollQuestion,
                 });
+            } else if (args.type === 'group-members') {
+                await runAutomatedGroupMembersFlow(wsaHdl, {
+                    profileKey,
+                });
             } else {
-                throw new Error(`Unknown type: ${args.type}. Supported types: convocados, convocatoria, poll-votes`);
+                throw new Error(`Unknown type: ${args.type}. Supported types: convocados, convocatoria, poll-votes, group-members`);
             }
         } catch (error) {
             console.error(`\nError: ${formatErrorDetails(error)}`);
@@ -751,7 +781,7 @@ async function main() {
     let running = true;
     while (running) {
         showMenu();
-        const choice = await prompt('Select an option (1-6): ');
+        const choice = await prompt('Select an option (1-7): ');
 
         try {
             switch (choice.trim()) {
@@ -771,10 +801,13 @@ async function main() {
                     await getPollVotersFlow(wsaHdl);
                     break;
                 case '6':
+                    await getGroupMembersFlow(wsaHdl);
+                    break;
+                case '7':
                     running = false;
                     break;
                 default:
-                    console.log('Invalid option. Please select 1-6.');
+                    console.log('Invalid option. Please select 1-7.');
             }
         } catch (error) {
             console.error(`Error: ${formatErrorDetails(error)}`);

@@ -42,7 +42,8 @@ export class TeamBalancerComponent {
         tdpHistory,
         seasonConfig.weights,
         player.sedeTemporadaAnterior,
-        seasonConfig.ptsTemporadaAnteriorIncludedInSum
+        seasonConfig.ptsTemporadaAnteriorIncludedInSum,
+        player.socioFundador
       );
       return { playerId: player.id, nombre: player.galactico, puntos: summary.puntos, selected: false };
     });

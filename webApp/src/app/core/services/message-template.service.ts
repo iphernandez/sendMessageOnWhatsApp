@@ -2,8 +2,8 @@ import { Injectable } from '@angular/core';
 
 /**
  * Fills {{key}} placeholders in convocatoria.md/convocados.md-style templates.
- * Mirrors the variable-replacement pattern used by jsApp/fileHandler.js, but supports
- * the double-brace syntax actually used in convocatoria.md.
+ * Mirrors the variable-replacement pattern used by the repo's other WhatsApp bot variants,
+ * but supports the double-brace syntax actually used in convocatoria.md.
  */
 @Injectable({ providedIn: 'root' })
 export class MessageTemplateService {

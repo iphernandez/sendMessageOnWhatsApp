@@ -150,6 +150,15 @@ export class WhatsAppHandler {
                     return true;
                 }
 
+                if (targetCommand === 'getParticipants') {
+                    const participants = chat.groupMetadata?.participants?.getModelsArray?.() || [];
+                    // Extract _serialized inside the evaluate - it's a getter dropped by JSON serialization.
+                    return participants.map((participant) => ({
+                        id: typeof participant.id === 'string' ? participant.id : participant.id?._serialized,
+                        isAdmin: !!(participant.isAdmin || participant.isSuperAdmin),
+                    }));
+                }
+
                 if (targetCommand === 'sendTextMessage') {
                     const msg = await window.WWebJS.sendMessage(chat, targetPayload.message, {
                         linkPreview: true,
@@ -655,6 +664,29 @@ export class WhatsAppHandler {
             `Found ${voters.length} voter(s) for option "${optionText}" in poll "${pollName}".`
         );
         return voters;
+    }
+
+    /**
+     * Get the list of members of a WhatsApp group, with their names and phone numbers.
+     * @param {string} groupName - The target group name.
+     * @returns {Promise<{ name: string, number: string, isAdmin: boolean }[]>} Array of group members.
+     */
+    async getGroupParticipants(groupName) {
+        const group = await this.getReadyGroup(groupName);
+        const rawParticipants = await this.runGroupCommand(group.id, 'getParticipants');
+
+        const members = [];
+        for (const participant of rawParticipants) {
+            const contact = await this.resolveVoterContact(participant.id);
+            members.push({
+                name: contact?.pushname || contact?.name || participant.id,
+                number: contact?.number || String(participant.id || '').split('@')[0],
+                isAdmin: participant.isAdmin,
+            });
+        }
+
+        console.log(`Found ${members.length} member(s) in group "${groupName}".`);
+        return members;
     }
 
     /**

@@ -10,4 +10,6 @@ export interface Player {
   cupoExPat: boolean;
   /** Hosted the field in the previous season -> seeds PtsTemporadaAnterior. */
   sedeTemporadaAnterior: boolean;
+  /** Single lifetime flag (not per-year, unlike the other TDP categories) - contributes TdpWeights.socioFundador once. */
+  socioFundador: boolean;
 }

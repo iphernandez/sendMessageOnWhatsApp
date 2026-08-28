@@ -1,5 +1,5 @@
 import { Injectable } from '@angular/core';
-import { TdpCategory, TdpHistoryEntry, TdpWeights } from '../models/tdp.model';
+import { TdpHistoryCategory, TdpHistoryEntry, TdpWeights } from '../models/tdp.model';
 import { WeeklyRecord } from '../models/weekly-record.model';
 
 export interface WeeklyScore {
@@ -88,13 +88,19 @@ export class ScoringService {
     return sedeTemporadaAnterior ? 7 : 0;
   }
 
-  /** TDP% = weighted sum of historical participation flags across categories. */
-  computeTdp(history: TdpHistoryEntry[], weights: TdpWeights): number {
-    const categories = Object.keys(weights) as TdpCategory[];
-    return categories.reduce((total, category) => {
+  /**
+   * TDP% = weighted sum of historical participation flags across per-year categories,
+   * plus the Socio Fundador weight once if the player has that single lifetime flag set.
+   */
+  computeTdp(history: TdpHistoryEntry[], weights: TdpWeights, socioFundador: boolean): number {
+    const categories = (Object.keys(weights) as (TdpHistoryCategory | 'socioFundador')[]).filter(
+      (c): c is TdpHistoryCategory => c !== 'socioFundador'
+    );
+    const perYearTotal = categories.reduce((total, category) => {
       const yearsParticipated = history.filter((h) => h.category === category && h.participated).length;
       return total + yearsParticipated * weights[category];
     }, 0);
+    return perYearTotal + (socioFundador ? weights.socioFundador : 0);
   }
 
   /** Puntos = (1 + TDP) * SUM(PtosFecha [+ PtsTemporadaAnterior if configured]). */
@@ -114,14 +120,16 @@ export class ScoringService {
     tdpHistory: TdpHistoryEntry[],
     weights: TdpWeights,
     sedeTemporadaAnterior: boolean,
-    includePtsTemporadaAnterior: boolean
+    includePtsTemporadaAnterior: boolean,
+    socioFundador: boolean
   ): PlayerScoreSummary {
     const records = weeklyRecords.filter((r) => r.playerId === playerId);
     const weeklyScores = this.computeWeeklyScores(records);
     const sumPtosFecha = weeklyScores.reduce((sum, w) => sum + w.ptosFecha, 0);
     const tdp = this.computeTdp(
       tdpHistory.filter((h) => h.playerId === playerId),
-      weights
+      weights,
+      socioFundador
     );
     const ptsTemporadaAnterior = this.computePtsTemporadaAnterior(sedeTemporadaAnterior);
     const puntos = this.computePuntos(tdp, sumPtosFecha, ptsTemporadaAnterior, includePtsTemporadaAnterior);

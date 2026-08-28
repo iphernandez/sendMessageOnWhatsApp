@@ -14,7 +14,7 @@ node index.js [options]
   Run an automated flow instead of opening the interactive menu.
 - `--test`
   Use the `TEST` entry from `config.json`. If omitted, the `FFCH` entry is used.
-- `--type <convocatoria|convocados|poll-votes>`
+- `--type <convocatoria|convocados|poll-votes|group-members>`
   Select which automated flow to run. Default: `convocatoria`.
 - `--season <name>`
   Select the season used by the `convocatoria` or `poll-votes` automated flow. If omitted, the flow uses the season resolved from `config.json`.
@@ -33,6 +33,7 @@ node index.js --auto --type convocatoria --season Verano
 node index.js --auto --type poll-votes
 node index.js --auto --type poll-votes --season Verano
 node index.js --auto --type poll-votes --poll-question "Quienes juegan hoy?"
+node index.js --auto --type group-members
 ```
 
 ## Notes
@@ -41,4 +42,5 @@ node index.js --auto --type poll-votes --poll-question "Quienes juegan hoy?"
 - Automated `convocatoria` renders the configured template, sends the message to the configured group, optionally sends `reglamento.md`, creates the poll, votes on it, and increments the selected season `WEEK_NUMBER`.
 - Automated `convocados` sends the configured message file to the configured group.
 - Automated `poll-votes` looks up the configured poll, fetches the voters for the configured yes-answer option, prints the voter list, and adds missing voters to `puntuacion.json` with the default score.
+- Automated `group-members` prints the configured group's member list (name and phone number). Also available as option 6 in the interactive menu (prompts for a group name).
 - Automated flows open a visible WhatsApp Web session in Chromium and reuse the authenticated local session managed by `LocalAuth`.

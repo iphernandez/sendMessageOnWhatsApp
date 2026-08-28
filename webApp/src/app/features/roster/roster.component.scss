@@ -7,7 +7,7 @@
   td {
     text-align: left;
     padding: 0.4rem 0.6rem;
-    border-bottom: 1px solid #dde3e8;
+    border-bottom: 1px solid var(--ffch-gray);
   }
 }
 
@@ -26,7 +26,7 @@
 .link {
   background: none;
   border: none;
-  color: #0b3d2e;
+  color: var(--ffch-blue-dark);
   text-decoration: underline;
   cursor: pointer;
   padding: 0;

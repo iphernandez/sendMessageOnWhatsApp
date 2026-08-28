@@ -41,6 +41,23 @@ Verificadas contra la tabla de leyenda al final de `FFCH - Puntuacion - TDP.csv`
   **peso independiente** del de Anfitrión Gala aunque el Excel original reusaba esa misma celda). Los
   pesos son editables en la app (Roster → Pesos TDP).
 
+  > **"Socios Fundadores" es distinto a las demás categorías**: en el Excel original es una **única
+  > columna** (no una por año, a diferencia de Año/Pre temporada/Galas/Partido del Pavo/Anfitrión
+  > Gala/Team Building). Por eso en la app es un **campo único por jugador** (`Player.socioFundador`,
+  > editable en Roster → tabla de Jugadores), no una entrada repetible en el historial TDP por año.
+
+  > **Verificado con datos reales**: la fila de Rafa en `FFCH - Puntuacion - TDP.csv` (TDP mostrado =
+  > 56%) reproduce exactamente ese 56% al aplicar la fórmula documentada en `formulas.txt`
+  > (`sum(D:S)*B49 + sum(T:AB)*B50 + sum(AC:AJ)*B51 + sum(AK)*B52 + sum(AL:AM)*B53 + sum(AN:AO)*B54 +
+  > sum(AP:AQ)*B54`). Al hacerlo se encontró que la columna `AK` (la única columna del término
+  > `sum(AK)*B52`, es decir, Socio Fundador) **no tiene año en el encabezado exportado** (celda en
+  > blanco) pero **sí es data real**, no una columna separadora — las etiquetas de grupo combinadas
+  > ("Socios fundadores", "Partido del Pavo", "Afitrion Gala", "Team Building") en la fila 1 del Excel
+  > están corridas una columna a la derecha respecto a lo que la fórmula realmente pondera. El
+  > importador (`CsvImportService`) ubica estas columnas por ancho fijo relativo a la columna "TDP"
+  > (16, 9, 8, 1, 2, 2, 2) en vez de por las etiquetas de grupo, y está cubierto por una prueba
+  > unitaria (`csv-import.service.spec.ts`) que reproduce el caso de Rafa.
+
 ## Reglas de tarjetas (`reglamento.md`)
 
 - 1ª tardanza (5+ min) en la temporada → Tarjeta Amarilla (solo advertencia, sin penalización de puntos).
@@ -58,6 +75,8 @@ Verificadas contra la tabla de leyenda al final de `FFCH - Puntuacion - TDP.csv`
   lógica especial de balanceo de equipos.
 - `tarde` (por jugador/fecha) — booleano capturado semana a semana para automatizar las tarjetas
   amarilla/roja por tardanza (antes solo había contadores agregados por temporada en `config.json`).
+- `socioFundador` ya existía conceptualmente en el Excel (columna `AK` de TDP.csv), pero ahora es un
+  campo explícito en `Player` en vez de vivir mezclado en la tabla de historial TDP por año.
 
 ## Re-ejecutar la migración
 

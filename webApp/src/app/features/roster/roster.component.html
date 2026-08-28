@@ -11,6 +11,7 @@
         <th>WA Número</th>
         <th>Activo</th>
         <th>Cupo ExPat</th>
+        <th>Socio Fundador</th>
         <th>Sede temp. anterior</th>
         <th></th>
       </tr>
@@ -26,6 +27,7 @@
           <td><input type="text" [(ngModel)]="player.wanumber" (change)="updatePlayer(player)" /></td>
           <td><input type="checkbox" [(ngModel)]="player.activo" (change)="updatePlayer(player)" /></td>
           <td><input type="checkbox" [(ngModel)]="player.cupoExPat" (change)="updatePlayer(player)" /></td>
+          <td><input type="checkbox" [(ngModel)]="player.socioFundador" (change)="updatePlayer(player)" /></td>
           <td><input type="checkbox" [(ngModel)]="player.sedeTemporadaAnterior" (change)="updatePlayer(player)" /></td>
           <td><button type="button" (click)="removePlayer(player)">Eliminar</button></td>
         </tr>
@@ -39,6 +41,7 @@
     <input type="text" name="bullying" placeholder="Apodo" [(ngModel)]="newPlayer.bullying" />
     <input type="text" name="wanumber" placeholder="WA número" [(ngModel)]="newPlayer.wanumber" />
     <label><input type="checkbox" name="cupoExPat" [(ngModel)]="newPlayer.cupoExPat" /> Cupo ExPat</label>
+    <label><input type="checkbox" name="socioFundador" [(ngModel)]="newPlayer.socioFundador" /> Socio Fundador</label>
     <label><input type="checkbox" name="sedeTemporadaAnterior" [(ngModel)]="newPlayer.sedeTemporadaAnterior" /> Sede temp. anterior</label>
     <button type="submit">Agregar</button>
   </form>
@@ -46,7 +49,8 @@
 
 @if (selectedPlayerId(); as playerId) {
   <section>
-    <h2>Historial TDP — {{ playerId }}</h2>
+    <h2>Historial TDP (por año) — {{ playerId }}</h2>
+    <p class="hint">"Socio Fundador" no aparece aquí: es un único valor por jugador, editable en la tabla de Jugadores arriba.</p>
     <table class="roster-table">
       <thead>
         <tr>
@@ -70,7 +74,7 @@
 
     <form class="inline-form" (ngSubmit)="addHistoryEntry()">
       <select name="category" [(ngModel)]="newHistoryEntry.category">
-        @for (option of categoryOptions; track option.value) {
+        @for (option of historyCategoryOptions; track option.value) {
           <option [value]="option.value">{{ option.label }}</option>
         }
       </select>
@@ -88,7 +92,7 @@
       "Team Building" es independiente de "Anfitrión Gala" (mismo valor por defecto, 1%), puedes ajustarlo aparte.
     </p>
     <div class="weights-grid">
-      @for (option of categoryOptions; track option.value) {
+      @for (option of weightCategoryOptions; track option.value) {
         <label>
           {{ option.label }}
           <input

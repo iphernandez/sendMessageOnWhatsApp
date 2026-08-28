@@ -7,11 +7,17 @@ export type TdpCategory =
   | 'anfitrionGala'
   | 'teamBuilding';
 
+/**
+ * Categories tracked per-year (one flag per year, e.g. "Galas" has one column per year attended).
+ * Excludes 'socioFundador', which is a single lifetime flag stored on Player instead (see player.model.ts).
+ */
+export type TdpHistoryCategory = Exclude<TdpCategory, 'socioFundador'>;
+
 /** One yes/no historical participation flag for a player, category and year. */
 export interface TdpHistoryEntry {
   id: string;
   playerId: string;
-  category: TdpCategory;
+  category: TdpHistoryCategory;
   year: number;
   participated: boolean;
 }

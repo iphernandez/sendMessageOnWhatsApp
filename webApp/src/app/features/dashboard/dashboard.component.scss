@@ -1,3 +1,42 @@
+.hero {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1.5rem;
+  background: var(--ffch-blue-light);
+  border: 1px solid var(--ffch-gray);
+  border-radius: 10px;
+  padding: 1rem 1.5rem;
+  margin-bottom: 1.5rem;
+  flex-wrap: wrap;
+
+  .hero-crest {
+    height: 96px;
+    width: auto;
+  }
+
+  .hero-mascot {
+    height: 84px;
+    width: auto;
+  }
+
+  .hero-text {
+    text-align: center;
+    flex: 1;
+    min-width: 200px;
+
+    h1 {
+      margin: 0;
+      color: var(--ffch-navy);
+    }
+
+    p {
+      margin: 0.25rem 0 0;
+      color: var(--ffch-blue-dark);
+    }
+  }
+}
+
 .standings {
   width: 100%;
   border-collapse: collapse;
@@ -6,10 +45,15 @@
   td {
     text-align: left;
     padding: 0.5rem 0.75rem;
-    border-bottom: 1px solid #dde3e8;
+    border-bottom: 1px solid var(--ffch-gray);
   }
 
   th {
-    background: #f2f6f4;
+    background: var(--ffch-blue);
+    color: white;
+  }
+
+  tbody tr:nth-child(even) {
+    background: var(--ffch-gray-light);
   }
 }

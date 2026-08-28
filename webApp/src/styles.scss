@@ -1,1 +1,16 @@
 /* You can add global styles to this file, and also import other style files */
+
+/* Palette sampled from Escudo_Oficial_SinFondo.png (navy/blue/gray/white). */
+:root {
+  --ffch-navy: #16213a;
+  --ffch-blue: #2c5aa0;
+  --ffch-blue-dark: #1d3f73;
+  --ffch-blue-light: #eaf0f9;
+  --ffch-gray: #9aa3ab;
+  --ffch-gray-light: #eef1f3;
+}
+
+body {
+  margin: 0;
+  background: var(--ffch-gray-light);
+}

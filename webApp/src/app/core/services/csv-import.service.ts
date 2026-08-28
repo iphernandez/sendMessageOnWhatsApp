@@ -2,7 +2,7 @@ import { Injectable } from '@angular/core';
 import Papa from 'papaparse';
 import { Player } from '../models/player.model';
 import { WeeklyRecord } from '../models/weekly-record.model';
-import { TdpCategory, TdpHistoryEntry, TdpWeights, DEFAULT_TDP_WEIGHTS } from '../models/tdp.model';
+import { TdpCategory, TdpHistoryCategory, TdpHistoryEntry, TdpWeights, DEFAULT_TDP_WEIGHTS } from '../models/tdp.model';
 import { FfchData } from '../models/ffch-data.model';
 
 export interface CsvImportResult {
@@ -10,23 +10,32 @@ export interface CsvImportResult {
   warnings: string[];
 }
 
-const STATIC_COLUMNS = ['Galactico', 'Bullying', 'Posicion', 'TDP', 'Puntos', 'SedeTemporadaAnterior', 'PtsTemporadaAnterior'] as const;
+const STATIC_COLUMNS = ['Galactico', 'Bullying', 'wanumber', 'Posicion', 'TDP', 'Puntos', 'SedeTemporadaAnterior', 'PtsTemporadaAnterior'] as const;
 
-const CATEGORY_LABELS: Record<string, TdpCategory> = {
-  'año': 'anualidad',
-  'ano': 'anualidad',
-  'pre temporada': 'pretemporada',
-  pretemporada: 'pretemporada',
-  galas: 'gala',
-  gala: 'gala',
-  'socios fundadores': 'socioFundador',
-  'socio fundador': 'socioFundador',
-  'partido del pavo': 'partidoPavo',
-  'partido pavo': 'partidoPavo',
-  'afitrion gala': 'anfitrionGala',
-  'anfitrion gala': 'anfitrionGala',
-  'team building': 'teamBuilding'
-};
+/**
+ * TDP.csv's per-year category columns (excludes Socio Fundador, handled separately below since it's
+ * a single lifetime column, not one-per-year), in the exact order/width used by its "TDP" formula:
+ * `sum(D:S)*B49 + sum(T:AB)*B50 + sum(AC:AJ)*B51 + sum(AK)*B52 + sum(AL:AM)*B53 + sum(AN:AO)*B54 + sum(AP:AQ)*B54`.
+ * Verified against the CSV data (Rafa: 16+9+8=33 "Año/Pretemporada/Galas" flags, then AK/AL:AM/AN:AO/AP:AQ
+ * all "1" except one blank -> 16*2% + 9*1% + 8*1% + 1*2% + 2*1% + 1*1% + 2*1% = 56%, matching Rafa's
+ * displayed TDP exactly). Column AK has no year label in the exported header row (blank) but IS live
+ * data, not a spacer - it is the sole column weighted by $B$52 (Socio Fundador). Row1's merged group
+ * labels ("Socios fundadores", "Partido del Pavo", "Afitrion Gala", "Team Building") are shifted one
+ * column to the right relative to the weights actually applied, so category columns are located by
+ * fixed width relative to the "TDP" column instead of by searching for those group labels.
+ */
+const TDP_PER_YEAR_COLUMN_WIDTHS: Array<{ category: TdpHistoryCategory; width: number }> = [
+  { category: 'anualidad', width: 16 }, // D:S
+  { category: 'pretemporada', width: 9 }, // T:AB
+  { category: 'gala', width: 8 } // AC:AJ
+];
+/** Single column (AK) right after the per-year "Galas" columns - one lifetime flag, not per-year. */
+const SOCIO_FUNDADOR_WIDTH = 1;
+const TDP_PER_YEAR_COLUMN_WIDTHS_AFTER_SOCIO_FUNDADOR: Array<{ category: TdpHistoryCategory; width: number }> = [
+  { category: 'partidoPavo', width: 2 }, // AL:AM
+  { category: 'anfitrionGala', width: 2 }, // AN:AO
+  { category: 'teamBuilding', width: 2 } // AP:AQ (reuses AnfitrionGala's weight in the original formula)
+];
 
 const WEIGHT_ROW_LABELS: Record<string, TdpCategory> = {
   anualidad: 'anualidad',
@@ -79,9 +88,10 @@ function parseFechaLabel(label: string): string | null {
 
 /**
  * Parses the two legacy Excel-exported CSVs (FFCH_Puntuacion/*.csv) into the app's
- * JSON schema. Column boundaries are discovered by header name/label search rather
- * than hardcoded indices, since the original spreadsheet's merged header cells shift
- * unpredictably once exported to plain CSV.
+ * JSON schema. Puntos.csv's weekly column boundaries are discovered by header name
+ * search (robust to merged-cell export shifts). TDP.csv's category columns are located
+ * by fixed width relative to the "TDP" column (see TDP_COLUMN_WIDTHS), since its row1
+ * group labels don't reliably align with the columns the TDP formula actually weights.
  */
 @Injectable({ providedIn: 'root' })
 export class CsvImportService {
@@ -176,11 +186,12 @@ export class CsvImportService {
         galactico,
         bullying: row[staticIndex['Bullying']]?.trim() ?? '',
         wanombre: '',
-        wanumber: '',
+        wanumber: row[staticIndex['wanumber']]?.trim() ?? '',
         posicion: posicionRaw ? Number(posicionRaw) : players.length + 1,
         activo: true,
         cupoExPat: false,
-        sedeTemporadaAnterior: toBoolean(row[staticIndex['SedeTemporadaAnterior']])
+        sedeTemporadaAnterior: toBoolean(row[staticIndex['SedeTemporadaAnterior']]),
+        socioFundador: false
       });
 
       blocks.forEach((block, blockIndex) => {
@@ -210,31 +221,33 @@ export class CsvImportService {
     players: Player[],
     warnings: string[]
   ): { tdpHistory: TdpHistoryEntry[]; weights: TdpWeights; playerTdpPercent: Map<string, number> } {
-    const groupLabelRow = rows[0] ?? [];
     const headerRow = rows[1] ?? [];
 
-    const labelColumns: Array<{ category: TdpCategory; startCol: number }> = [];
-    groupLabelRow.forEach((cellRaw, col) => {
-      const cell = normalize(cellRaw ?? '');
-      if (!cell) return;
-      const category = CATEGORY_LABELS[cell];
-      if (category) {
-        labelColumns.push({ category, startCol: col });
-      } else {
-        warnings.push(`Etiqueta de categoría TDP no reconocida: "${cellRaw}" (columna ${col}).`);
-      }
-    });
+    const tdpCol = headerRow.findIndex((cell) => cell?.trim() === 'TDP');
+    if (tdpCol === -1) {
+      throw new Error('No se encontró la columna "TDP" en el CSV de TDP.');
+    }
 
-    const categoryColumns: Array<{ category: TdpCategory; col: number; year: number }> = [];
-    labelColumns.forEach((label, i) => {
-      const endCol = i + 1 < labelColumns.length ? labelColumns[i + 1].startCol : headerRow.length;
-      for (let col = label.startCol; col < endCol; col++) {
-        const yearMatch = headerRow[col]?.match(/(\d{4})/);
-        if (yearMatch) {
-          categoryColumns.push({ category: label.category, col, year: Number(yearMatch[1]) });
+    const categoryColumns: Array<{ category: TdpHistoryCategory; col: number; year: number }> = [];
+    let col = tdpCol + 1;
+    const addColumns = (widths: Array<{ category: TdpHistoryCategory; width: number }>) => {
+      for (const { category, width } of widths) {
+        for (let i = 0; i < width; i++, col++) {
+          const yearMatch = headerRow[col]?.match(/(\d{4})/);
+          if (!yearMatch) {
+            warnings.push(
+              `Columna ${col} (categoría "${category}") no tiene año en el encabezado ("${headerRow[col] ?? ''}"); ` +
+                'se cuenta igual para el TDP pero sin año identificable.'
+            );
+          }
+          categoryColumns.push({ category, col, year: yearMatch ? Number(yearMatch[1]) : 1900 + col });
         }
       }
-    });
+    };
+    addColumns(TDP_PER_YEAR_COLUMN_WIDTHS);
+    const socioFundadorCol = col; // AK: single lifetime flag, not per-year - see SOCIO_FUNDADOR_WIDTH.
+    col += SOCIO_FUNDADOR_WIDTH;
+    addColumns(TDP_PER_YEAR_COLUMN_WIDTHS_AFTER_SOCIO_FUNDADOR);
 
     // Weight rows appear as plain "Nombre,Valor%" rows near the bottom of the sheet.
     const weights: TdpWeights = { ...DEFAULT_TDP_WEIGHTS };
@@ -252,12 +265,19 @@ export class CsvImportService {
     weights.teamBuilding = weights.teamBuilding ?? weights.anfitrionGala;
 
     const galacticoCol = 0;
-    const tdpPercentCol = 2; // "Galactico,Bullying,TDP,..." per the source layout.
+    const tdpPercentCol = tdpCol;
 
     const tdpHistory: TdpHistoryEntry[] = [];
     const playerTdpPercent = new Map<string, number>();
 
-    rows.slice(2).forEach((row) => {
+    const dataRows = rows.slice(2);
+    // Below the player rows the sheet continues with a blank separator row, then "Pesos"/weight rows,
+    // "Reglas" notes and the Convocado/Jugo/Sede legend table - stop at the first fully-blank row so
+    // those aren't mistaken for unmatched players (a plain `return` inside forEach only skips one row).
+    const blankRowIndex = dataRows.findIndex((row) => row.every((cell) => !cell?.trim()));
+    const playerRows = blankRowIndex === -1 ? dataRows : dataRows.slice(0, blankRowIndex);
+
+    playerRows.forEach((row) => {
       const galactico = row[galacticoCol]?.trim();
       if (!galactico) return;
       const player = players.find((p) => normalize(p.galactico) === normalize(galactico));
@@ -271,13 +291,16 @@ export class CsvImportService {
         playerTdpPercent.set(galactico, Number(percentMatch[1]) / 100);
       }
 
-      categoryColumns.forEach(({ category, col, year }) => {
+      // Single lifetime flag, applied directly to the player rather than as a per-year history entry.
+      player.socioFundador = toBoolean(row[socioFundadorCol]);
+
+      categoryColumns.forEach(({ category, col: dataCol, year }) => {
         tdpHistory.push({
-          id: `${player.id}-${category}-${year}`,
+          id: `${player.id}-${category}-${dataCol}`,
           playerId: player.id,
           category,
           year,
-          participated: toBoolean(row[col])
+          participated: toBoolean(row[dataCol])
         });
       });
     });

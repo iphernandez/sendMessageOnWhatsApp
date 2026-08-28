@@ -51,7 +51,8 @@ export class DashboardComponent {
           tdpHistory,
           seasonConfig.weights,
           player.sedeTemporadaAnterior,
-          seasonConfig.ptsTemporadaAnteriorIncludedInSum
+          seasonConfig.ptsTemporadaAnteriorIncludedInSum,
+          player.socioFundador
         )
       }));
 

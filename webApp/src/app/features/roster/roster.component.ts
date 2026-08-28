@@ -2,10 +2,10 @@ import { Component, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { DataStoreService } from '../../core/services/data-store.service';
 import { Player } from '../../core/models/player.model';
-import { TdpCategory, TdpHistoryEntry, TdpWeights } from '../../core/models/tdp.model';
+import { TdpCategory, TdpHistoryCategory, TdpHistoryEntry, TdpWeights } from '../../core/models/tdp.model';
 import { SeasonConfig } from '../../core/models/season-config.model';
 
-const CATEGORY_OPTIONS: Array<{ value: TdpCategory; label: string }> = [
+const WEIGHT_CATEGORY_OPTIONS: Array<{ value: TdpCategory; label: string }> = [
   { value: 'anualidad', label: 'Año (Anualidad)' },
   { value: 'pretemporada', label: 'Pre temporada' },
   { value: 'gala', label: 'Gala' },
@@ -14,6 +14,11 @@ const CATEGORY_OPTIONS: Array<{ value: TdpCategory; label: string }> = [
   { value: 'anfitrionGala', label: 'Anfitrión Gala' },
   { value: 'teamBuilding', label: 'Team Building' }
 ];
+
+/** Historial TDP dropdown only offers per-year categories - Socio Fundador is a single Player flag instead. */
+const HISTORY_CATEGORY_OPTIONS: Array<{ value: TdpHistoryCategory; label: string }> = WEIGHT_CATEGORY_OPTIONS.filter(
+  (o): o is { value: TdpHistoryCategory; label: string } => o.value !== 'socioFundador'
+);
 
 function slugify(text: string): string {
   return (
@@ -34,14 +39,20 @@ function slugify(text: string): string {
   styleUrl: './roster.component.scss'
 })
 export class RosterComponent {
-  readonly categoryOptions = CATEGORY_OPTIONS;
+  readonly weightCategoryOptions = WEIGHT_CATEGORY_OPTIONS;
+  readonly historyCategoryOptions = HISTORY_CATEGORY_OPTIONS;
   readonly players = signal<Player[]>([]);
   readonly seasonConfig = signal<SeasonConfig | null>(null);
   readonly selectedPlayerId = signal<string | null>(null);
   readonly selectedPlayerHistory = signal<TdpHistoryEntry[]>([]);
 
-  readonly newPlayer: Partial<Player> = { activo: true, cupoExPat: false, sedeTemporadaAnterior: false };
-  readonly newHistoryEntry: { category: TdpCategory; year: number; participated: boolean } = {
+  readonly newPlayer: Partial<Player> = {
+    activo: true,
+    cupoExPat: false,
+    sedeTemporadaAnterior: false,
+    socioFundador: false
+  };
+  readonly newHistoryEntry: { category: TdpHistoryCategory; year: number; participated: boolean } = {
     category: 'anualidad',
     year: new Date().getFullYear(),
     participated: true
@@ -77,7 +88,8 @@ export class RosterComponent {
       posicion: this.newPlayer.posicion ?? this.players().length + 1,
       activo: true,
       cupoExPat: !!this.newPlayer.cupoExPat,
-      sedeTemporadaAnterior: !!this.newPlayer.sedeTemporadaAnterior
+      sedeTemporadaAnterior: !!this.newPlayer.sedeTemporadaAnterior,
+      socioFundador: !!this.newPlayer.socioFundador
     };
 
     await this.store.players.add(player);
@@ -88,6 +100,7 @@ export class RosterComponent {
     this.newPlayer.posicion = undefined;
     this.newPlayer.cupoExPat = false;
     this.newPlayer.sedeTemporadaAnterior = false;
+    this.newPlayer.socioFundador = false;
     await this.load();
   }
 
@@ -143,7 +156,7 @@ export class RosterComponent {
     await this.selectPlayer(entry.playerId);
   }
 
-  categoryLabel(category: TdpCategory): string {
-    return this.categoryOptions.find((c) => c.value === category)?.label ?? category;
+  categoryLabel(category: TdpHistoryCategory): string {
+    return this.historyCategoryOptions.find((c) => c.value === category)?.label ?? category;
   }
 }
