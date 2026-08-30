@@ -1,13 +1,22 @@
 <header class="topbar">
   <span class="brand"><img src="images/escudo.png" alt="Escudo FFCH" class="brand-icon" /> {{ title() }}</span>
-  <nav>
-    <a routerLink="/" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }">Dashboard</a>
-    <a routerLink="/roster" routerLinkActive="active">Roster</a>
-    <a routerLink="/captura" routerLinkActive="active">Captura Semanal</a>
-    <a routerLink="/equipos" routerLinkActive="active">Equipos</a>
-    <a routerLink="/convocatoria" routerLinkActive="active">Convocatoria</a>
-    <a routerLink="/ajustes" routerLinkActive="active">Ajustes</a>
-  </nav>
+  @if (auth.currentUser(); as user) {
+    <nav>
+      <a routerLink="/" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }">Dashboard</a>
+      @if (user.isAdmin) {
+        <a routerLink="/roster" routerLinkActive="active">Roster</a>
+        <a routerLink="/captura" routerLinkActive="active">Captura Semanal</a>
+        <a routerLink="/equipos" routerLinkActive="active">Equipos</a>
+        <a routerLink="/convocatoria" routerLinkActive="active">Convocatoria</a>
+        <a routerLink="/ajustes" routerLinkActive="active">Ajustes</a>
+        <a routerLink="/usuarios" routerLinkActive="active">Usuarios</a>
+      }
+    </nav>
+    <div class="session">
+      <a routerLink="/cuenta" routerLinkActive="active">{{ user.name }}</a>
+      <button type="button" (click)="logout()">Salir</button>
+    </div>
+  }
 </header>
 
 <main class="content">

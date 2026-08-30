@@ -6,6 +6,7 @@ import { TdpHistoryEntry } from '../models/tdp.model';
 import { SeasonConfig } from '../models/season-config.model';
 import { DEFAULT_TDP_WEIGHTS } from '../models/tdp.model';
 import { FfchData } from '../models/ffch-data.model';
+import { UserRecord } from '../models/user.model';
 
 const SEASON_CONFIG_ID = 'default';
 const GITHUB_TOKEN_KEY = 'githubToken';
@@ -26,6 +27,7 @@ export class DataStoreService extends Dexie {
   tdpHistory!: Table<TdpHistoryEntry, string>;
   seasonConfig!: Table<SeasonConfig, string>;
   settings!: Table<SettingEntry, string>;
+  users!: Table<UserRecord, string>;
 
   constructor() {
     super('ffch-puntuacion');
@@ -35,6 +37,14 @@ export class DataStoreService extends Dexie {
       tdpHistory: 'id, playerId, category, year',
       seasonConfig: 'id',
       settings: 'key'
+    });
+    this.version(2).stores({
+      players: 'id, galactico, posicion, activo',
+      weeklyRecords: 'id, playerId, fecha',
+      tdpHistory: 'id, playerId, category, year',
+      seasonConfig: 'id',
+      settings: 'key',
+      users: 'id, &email'
     });
   }
 
@@ -50,6 +60,20 @@ export class DataStoreService extends Dexie {
 
   async clearGithubToken(): Promise<void> {
     await this.settings.delete(GITHUB_TOKEN_KEY);
+  }
+
+  /** Generic key/value entry in the local settings table, used e.g. to persist the logged-in user id. */
+  async getSetting(key: string): Promise<string | null> {
+    const entry = await this.settings.get(key);
+    return entry?.value ?? null;
+  }
+
+  async setSetting(key: string, value: string): Promise<void> {
+    await this.settings.put({ key, value });
+  }
+
+  async clearSetting(key: string): Promise<void> {
+    await this.settings.delete(key);
   }
 
   async getSeasonConfig(): Promise<SeasonConfig> {

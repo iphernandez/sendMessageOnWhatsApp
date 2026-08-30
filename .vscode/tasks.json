@@ -1,4 +1,23 @@
 {
 	"version": "2.0.0",
-	"tasks": []
+	"tasks": [
+		{
+			"label": "start-webapp",
+			"type": "npm",
+			"script": "start",
+			"path": "webApp",
+			"isBackground": true,
+			"problemMatcher": {
+				"owner": "webApp",
+				"pattern": {
+					"regexp": "^$"
+				},
+				"background": {
+					"activeOnStart": true,
+					"beginsPattern": "Building\\.\\.\\.|Application bundle generation complete",
+					"endsPattern": "Local:\\s+https?://localhost:[0-9]+"
+				}
+			}
+		}
+	]
 }

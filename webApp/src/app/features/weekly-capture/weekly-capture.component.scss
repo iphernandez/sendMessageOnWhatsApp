@@ -19,4 +19,8 @@
   th:first-child {
     text-align: left;
   }
+
+  tbody tr:hover {
+    background: var(--ffch-blue-light);
+  }
 }

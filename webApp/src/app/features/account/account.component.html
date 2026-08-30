@@ -1,0 +1,62 @@
+<h1>Mi cuenta</h1>
+
+@if (auth.currentUser(); as user) {
+  <section>
+    <h2>Datos</h2>
+    <p><strong>Nombre:</strong> {{ user.name }}</p>
+    <p><strong>Correo:</strong> {{ user.email }}</p>
+    <p><strong>Rol:</strong> {{ user.isAdmin ? 'Administrador' : 'Usuario' }}</p>
+  </section>
+
+  @if (user.mustChangePassword) {
+    <p class="warning">Tienes una contraseña temporal. Cámbiala antes de continuar.</p>
+  }
+
+  <section>
+    <h2>Cambiar contraseña</h2>
+    <form (ngSubmit)="changePassword()">
+      <label>
+        Contraseña actual
+        <input
+          type="password"
+          required
+          [ngModel]="currentPassword()"
+          (ngModelChange)="currentPassword.set($event)"
+          name="currentPassword"
+        />
+      </label>
+      <label>
+        Nueva contraseña (mínimo 8 caracteres)
+        <input
+          type="password"
+          required
+          minlength="8"
+          [ngModel]="newPassword()"
+          (ngModelChange)="newPassword.set($event)"
+          name="newPassword"
+        />
+      </label>
+      <button type="submit" [disabled]="busy()">Actualizar contraseña</button>
+    </form>
+  </section>
+
+  <section>
+    <h2>Código de recuperación</h2>
+    <p class="hint">
+      Se usa en "Olvidé mi contraseña" si no recuerdas tu contraseña. Guárdalo en un lugar seguro; al regenerarlo el
+      código anterior deja de funcionar.
+    </p>
+    <button type="button" (click)="regenerateRecoveryCode()" [disabled]="busy()">Generar nuevo código</button>
+
+    @if (newRecoveryCode(); as code) {
+      <div class="recovery-box">
+        <p><strong>Nuevo código (guárdalo ahora, no se mostrará de nuevo):</strong></p>
+        <code>{{ code }}</code>
+      </div>
+    }
+  </section>
+
+  @if (statusMessage()) {
+    <p class="status" [class.error]="statusIsError()">{{ statusMessage() }}</p>
+  }
+}

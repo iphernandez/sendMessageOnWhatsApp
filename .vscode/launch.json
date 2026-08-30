@@ -13,6 +13,15 @@
             "program": "index.js",
             "cwd": "${workspaceFolder}\\webJsApp",
             "console": "integratedTerminal"
+        },
+        {
+            "name": "Launch WebApp",
+            "type": "node-terminal",
+            "request": "launch",
+            // explorer.exe opens the default browser and works the same whether the integrated shell is bash, cmd or PowerShell.
+            "command": "explorer.exe \"http://localhost:4200\"",
+            "cwd": "${workspaceFolder}\\webApp",
+            "preLaunchTask": "start-webapp"
         }
     ]
 }

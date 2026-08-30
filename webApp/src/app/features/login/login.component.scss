@@ -1,0 +1,92 @@
+:host {
+  display: flex;
+  justify-content: center;
+  padding: 2.5rem 1rem;
+}
+
+.auth-card {
+  width: 100%;
+  max-width: 420px;
+  background: white;
+  border: 1px solid #d7dde3;
+  border-radius: 10px;
+  padding: 1.75rem;
+
+  h1 {
+    margin-top: 0;
+    text-align: center;
+    font-size: 1.35rem;
+  }
+}
+
+.tabs {
+  display: flex;
+  gap: 0.35rem;
+  margin-bottom: 1.25rem;
+
+  button {
+    flex: 1;
+    padding: 0.5rem;
+    border: 1px solid #d7dde3;
+    background: #f4f6f8;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.85rem;
+
+    &.active {
+      background: var(--ffch-navy, #1f2933);
+      color: white;
+      border-color: transparent;
+    }
+  }
+}
+
+form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+}
+
+label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  font-weight: 600;
+  font-size: 0.9rem;
+
+  input {
+    font-weight: normal;
+    padding: 0.5rem;
+    border-radius: 6px;
+    border: 1px solid #c6ccd2;
+  }
+}
+
+.hint {
+  color: #55606a;
+  font-size: 0.8rem;
+  font-weight: normal;
+}
+
+.recovery-box {
+  margin-top: 1rem;
+  background: #fff6e5;
+  border: 1px solid #e8c766;
+  padding: 0.75rem;
+  border-radius: 6px;
+
+  code {
+    font-size: 1.1rem;
+    display: block;
+    margin-top: 0.35rem;
+  }
+}
+
+.status {
+  margin-top: 1rem;
+  font-weight: 600;
+
+  &.error {
+    color: #b3261e;
+  }
+}

@@ -1,0 +1,55 @@
+<h1>Usuarios</h1>
+
+<p class="hint">
+  Las cuentas se guardan solo en este navegador (IndexedDB), no se sincronizan con GitHub. Solo un administrador
+  puede otorgar o quitar el rol de administrador. Debe existir al menos un administrador en todo momento.
+</p>
+
+@if (loading()) {
+  <p>Cargando...</p>
+} @else {
+  <table class="users">
+    <thead>
+      <tr>
+        <th>Nombre</th>
+        <th>Correo</th>
+        <th>Rol</th>
+        <th>Debe cambiar contraseña</th>
+        <th>Acciones</th>
+      </tr>
+    </thead>
+    <tbody>
+      @for (user of users(); track user.id) {
+        <tr>
+          <td>{{ user.name }}</td>
+          <td>{{ user.email }}</td>
+          <td>{{ user.isAdmin ? 'Administrador' : 'Usuario' }}</td>
+          <td>{{ user.mustChangePassword ? 'Sí' : 'No' }}</td>
+          <td class="actions">
+            <button type="button" (click)="toggleAdmin(user)">
+              {{ user.isAdmin ? 'Quitar administrador' : 'Hacer administrador' }}
+            </button>
+            <button type="button" (click)="resetPassword(user)">Restablecer contraseña</button>
+            <button type="button" class="danger" (click)="removeUser(user)">Eliminar</button>
+          </td>
+        </tr>
+        @if (tempPasswordFor()?.userId === user.id) {
+          <tr>
+            <td colspan="5">
+              <div class="recovery-box">
+                <p>
+                  <strong>Contraseña temporal para {{ user.email }} (compártela de forma segura, no se mostrará de nuevo):</strong>
+                </p>
+                <code>{{ tempPasswordFor()?.password }}</code>
+              </div>
+            </td>
+          </tr>
+        }
+      }
+    </tbody>
+  </table>
+}
+
+@if (statusMessage()) {
+  <p class="status" [class.error]="statusIsError()">{{ statusMessage() }}</p>
+}
