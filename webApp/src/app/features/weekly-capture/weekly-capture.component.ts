@@ -60,9 +60,26 @@ export class WeeklyCaptureComponent {
     await this.loadFechas();
   }
 
+  async deleteRow(row: CaptureRow): Promise<void> {
+    const confirmed = confirm(`¿Eliminar el registro de ${row.player.galactico} para ${this.selectedFecha()}? Esto también elimina cualquier cálculo derivado de ese registro.`);
+    if (!confirmed) return;
+    await this.store.weeklyRecords.delete(row.record.id);
+    await this.loadFechas();
+    await this.loadRows();
+  }
+
   async createFecha(fecha: string): Promise<void> {
     if (!fecha) return;
     this.selectedFecha.set(fecha);
+    await this.loadRows();
+  }
+
+  async deleteFecha(): Promise<void> {
+    const fecha = this.selectedFecha();
+    const confirmed = confirm(`¿Eliminar la captura completa de ${fecha} para todos los jugadores? Esto también elimina cualquier cálculo derivado de esos registros.`);
+    if (!confirmed) return;
+    await this.store.weeklyRecords.where('fecha').equals(fecha).delete();
+    await this.loadFechas();
     await this.loadRows();
   }
 }
