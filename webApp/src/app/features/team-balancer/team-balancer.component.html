@@ -7,7 +7,7 @@
     <li>
       <label>
         <input type="checkbox" [(ngModel)]="candidate.selected" />
-        {{ candidate.nombre }} ({{ candidate.puntos.toFixed(2) }})
+        {{ candidate.nombre }} (Rating {{ candidate.rating.toFixed(0) }})
       </label>
     </li>
   }
@@ -15,13 +15,69 @@
 
 <button type="button" (click)="buildTeams()">Armar equipos</button>
 
+@if (lastWinner() !== null) {
+  <p>Último ganador: {{ lastWinner() === 'teamA' ? 'Equipo A' : 'Equipo B' }}</p>
+}
+
+<label>
+  Resultado del último partido:
+  <select [ngModel]="lastWinner()" (ngModelChange)="applyLastGameResult($event)">
+    <option [ngValue]="null">Selecciona ganador</option>
+    <option value="teamA">Equipo A ganó</option>
+    <option value="teamB">Equipo B ganó</option>
+  </select>
+</label>
+
+<h2>Restricciones de equipo</h2>
+<p>Se usa el ID interno del jugador para la regla. El WA number es solo una etiqueta visible.</p>
+<div>
+  <label>
+    Jugador A:
+    <select [ngModel]="restrictionAId()" (ngModelChange)="restrictionAId.set($event)">
+      <option value="">Selecciona</option>
+      @for (candidate of candidates(); track candidate.playerId) {
+        <option [value]="candidate.playerId">{{ playerLabel(candidate) }}</option>
+      }
+    </select>
+  </label>
+
+  <label>
+    Jugador B:
+    <select [ngModel]="restrictionBId()" (ngModelChange)="restrictionBId.set($event)">
+      <option value="">Selecciona</option>
+      @for (candidate of candidates(); track candidate.playerId) {
+        <option [value]="candidate.playerId">{{ playerLabel(candidate) }}</option>
+      }
+    </select>
+  </label>
+
+  <button type="button" (click)="addRestriction()">Guardar restricción</button>
+</div>
+
+@if (restrictions().length > 0) {
+  <ul>
+    @for (restriction of restrictions(); track restriction.id) {
+      <li>
+        {{
+          candidates().find((candidate) => candidate.playerId === restriction.playerAId)?.nombre ?? 'Jugador'
+        }}
+        +
+        {{
+          candidates().find((candidate) => candidate.playerId === restriction.playerBId)?.nombre ?? 'Jugador'
+        }}
+        <button type="button" (click)="deleteRestriction(restriction.id)">Eliminar</button>
+      </li>
+    }
+  </ul>
+}
+
 @if (teams(); as t) {
   <div class="teams">
     <div class="team">
       <h2>🟧 Equipo A</h2>
       <ul>
         @for (p of t.teamA.players; track p.playerId) {
-          <li>{{ p.nombre }} ({{ p.puntos.toFixed(0) }})</li>
+          <li>{{ p.nombre }} ({{ p.rating.toFixed(0) }})</li>
         }
       </ul>
       <p>Total {{ t.teamA.total.toFixed(0) }} | Prom {{ t.teamA.promedio.toFixed(2) }}</p>
@@ -30,7 +86,7 @@
       <h2>🔵 Equipo B</h2>
       <ul>
         @for (p of t.teamB.players; track p.playerId) {
-          <li>{{ p.nombre }} ({{ p.puntos.toFixed(0) }})</li>
+          <li>{{ p.nombre }} ({{ p.rating.toFixed(0) }})</li>
         }
       </ul>
       <p>Total {{ t.teamB.total.toFixed(0) }} | Prom {{ t.teamB.promedio.toFixed(2) }}</p>
@@ -39,4 +95,19 @@
 
   <button type="button" (click)="copyToClipboard()">Copiar texto para WhatsApp</button>
   <pre class="preview">{{ copyText() }}</pre>
+}
+
+@if (pastTeams().length > 0) {
+  <h2>Equipos anteriores</h2>
+  <ul>
+    @for (entry of pastTeams(); track entry.date) {
+      <li>
+        {{ formatDate(entry.date) }} — Ganador: {{ entry.winner === 'teamA' ? 'Equipo A' : 'Equipo B' }}
+        <br />
+        A: {{ entry.teamA.join(', ') || '—' }}
+        <br />
+        B: {{ entry.teamB.join(', ') || '—' }}
+      </li>
+    }
+  </ul>
 }

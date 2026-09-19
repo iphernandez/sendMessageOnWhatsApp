@@ -6,6 +6,8 @@ export interface Player {
   wanumber: string;
   posicion: number;
   activo: boolean;
+  /** Current team-balancer rating in the 1..10 range, persisted in IndexedDB. */
+  rating?: number;
   /** Foreign-player quota flag (legend "Cupo ExPat" in the original spreadsheet). */
   cupoExPat: boolean;
   /** Hosted the field in the previous season -> seeds PtsTemporadaAnterior. */

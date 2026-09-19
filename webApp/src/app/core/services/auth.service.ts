@@ -1,5 +1,6 @@
 import { Injectable, signal } from '@angular/core';
 import { DataStoreService } from './data-store.service';
+import { GithubSyncService } from './github-sync.service';
 import { PublicUser, UserRecord } from '../models/user.model';
 
 const PBKDF2_ITERATIONS = 150_000;
@@ -88,7 +89,10 @@ export class AuthService {
   readonly ready = signal(false);
   private readonly initPromise: Promise<void>;
 
-  constructor(private readonly store: DataStoreService) {
+  constructor(
+    private readonly store: DataStoreService,
+    private readonly githubSync: GithubSyncService
+  ) {
     this.initPromise = this.init();
   }
 
@@ -177,7 +181,28 @@ export class AuthService {
 
     await this.store.setSetting(CURRENT_USER_KEY, user.id);
     this.currentUser.set(toPublicUser(user));
+    await this.autoSyncSharedDataIfNeeded();
     return { success: true };
+  }
+
+  private async autoSyncSharedDataIfNeeded(): Promise<void> {
+    const [playersCount, weeklyRecordsCount, tdpHistoryCount] = await Promise.all([
+      this.store.players.count(),
+      this.store.weeklyRecords.count(),
+      this.store.tdpHistory.count()
+    ]);
+
+    if (playersCount > 0 || weeklyRecordsCount > 0 || tdpHistoryCount > 0) {
+      return;
+    }
+
+    try {
+      const token = await this.store.getGithubToken();
+      const { data } = await this.githubSync.pull(token ?? undefined);
+      await this.store.importAll(data);
+    } catch {
+      // Ignore sync failures during first login; the user can still use the app with local data or retry later.
+    }
   }
 
   logout(): void {

@@ -24,7 +24,7 @@ export class GithubSyncConflictError extends Error {
  */
 @Injectable({ providedIn: 'root' })
 export class GithubSyncService {
-  async pull(token: string): Promise<RemoteFile> {
+  async pull(token?: string): Promise<RemoteFile> {
     const response = await fetch(
       `${API_BASE}/repos/${OWNER}/${REPO}/contents/${encodeURI(DATA_PATH)}`,
       { headers: this.buildHeaders(token) }
@@ -66,12 +66,20 @@ export class GithubSyncService {
     return body.content.sha as string;
   }
 
-  private buildHeaders(token: string): HeadersInit {
-    return {
-      Authorization: `Bearer ${token}`,
+  private buildHeaders(token?: string): HeadersInit {
+    const headers: HeadersInit = {
       Accept: 'application/vnd.github+json',
       'X-GitHub-Api-Version': '2022-11-28'
     };
+
+    if (token) {
+      return {
+        ...headers,
+        Authorization: `Bearer ${token}`
+      };
+    }
+
+    return headers;
   }
 
   private decodeBase64Utf8(base64: string): string {
