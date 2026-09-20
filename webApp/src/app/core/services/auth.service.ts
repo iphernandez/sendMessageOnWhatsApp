@@ -79,7 +79,13 @@ export class AuthService {
   }
 
   private async init(): Promise<void> {
-    await this.seedAdminIfNeeded();
+    try {
+      await this.seedAdminIfNeeded();
+    } catch (error) {
+      // Don't let a setup problem (rules not published yet, domain not authorized, etc.) hang the app.
+      console.error('No se pudo verificar/crear la cuenta administradora inicial:', error);
+    }
+
     await new Promise<void>((resolve) => {
       const unsubscribe = onAuthStateChanged(firebaseAuth, async (firebaseUser) => {
         await this.syncCurrentUser(firebaseUser);
@@ -96,14 +102,20 @@ export class AuthService {
       this.currentUser.set(null);
       return;
     }
-    const profile = await this.loadProfile(firebaseUser.uid);
-    if (!profile || profile.disabled) {
+    try {
+      const profile = await this.loadProfile(firebaseUser.uid);
+      if (!profile || profile.disabled) {
+        this.currentUser.set(null);
+        if (profile?.disabled) await signOut(firebaseAuth);
+        return;
+      }
+      this.currentUser.set(profile);
+      await this.autoSyncSharedDataIfNeeded();
+    } catch (error) {
+      // Firestore unreachable/rules misconfigured: fail closed (signed out) instead of hanging init().
+      console.error('No se pudo cargar el perfil del usuario:', error);
       this.currentUser.set(null);
-      if (profile?.disabled) await signOut(firebaseAuth);
-      return;
     }
-    this.currentUser.set(profile);
-    await this.autoSyncSharedDataIfNeeded();
   }
 
   private async loadProfile(uid: string): Promise<PublicUser | null> {
