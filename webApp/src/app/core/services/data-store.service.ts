@@ -6,10 +6,8 @@ import { TdpHistoryEntry } from '../models/tdp.model';
 import { SeasonConfig } from '../models/season-config.model';
 import { DEFAULT_TDP_WEIGHTS } from '../models/tdp.model';
 import { FfchData } from '../models/ffch-data.model';
-import { UserRecord } from '../models/user.model';
 
 const SEASON_CONFIG_ID = 'default';
-const GITHUB_TOKEN_KEY = 'githubToken';
 
 interface SettingEntry {
   key: string;
@@ -17,8 +15,8 @@ interface SettingEntry {
 }
 
 /**
- * Client-side database (IndexedDB via Dexie) - no server required.
- * This is the app's "local database"; GithubSyncService layers repo sync on top of it.
+ * Client-side database (IndexedDB via Dexie) - local cache/query engine for the shared FFCH data.
+ * RemoteSyncService layers Firestore sync on top of it.
  */
 @Injectable({ providedIn: 'root' })
 export class DataStoreService extends Dexie {
@@ -27,7 +25,6 @@ export class DataStoreService extends Dexie {
   tdpHistory!: Table<TdpHistoryEntry, string>;
   seasonConfig!: Table<SeasonConfig, string>;
   settings!: Table<SettingEntry, string>;
-  users!: Table<UserRecord, string>;
 
   constructor() {
     super('ffch-puntuacion');
@@ -38,6 +35,8 @@ export class DataStoreService extends Dexie {
       seasonConfig: 'id',
       settings: 'key'
     });
+    // v2 added a local `users` table for accounts; superseded by Firebase Auth + Firestore, table left
+    // unused (harmless leftover) rather than migrated, to avoid a destructive schema-deletion migration.
     this.version(2).stores({
       players: 'id, galactico, posicion, activo',
       weeklyRecords: 'id, playerId, fecha',
@@ -46,20 +45,6 @@ export class DataStoreService extends Dexie {
       settings: 'key',
       users: 'id, &email'
     });
-  }
-
-  /** Fine-grained PAT, kept only in IndexedDB (never localStorage/cookies), never logged. */
-  async getGithubToken(): Promise<string | null> {
-    const entry = await this.settings.get(GITHUB_TOKEN_KEY);
-    return entry?.value ?? null;
-  }
-
-  async setGithubToken(token: string): Promise<void> {
-    await this.settings.put({ key: GITHUB_TOKEN_KEY, value: token });
-  }
-
-  async clearGithubToken(): Promise<void> {
-    await this.settings.delete(GITHUB_TOKEN_KEY);
   }
 
   /** Generic key/value entry in the local settings table, used e.g. to persist the logged-in user id. */

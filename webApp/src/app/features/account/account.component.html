@@ -40,22 +40,6 @@
     </form>
   </section>
 
-  <section>
-    <h2>Código de recuperación</h2>
-    <p class="hint">
-      Se usa en "Olvidé mi contraseña" si no recuerdas tu contraseña. Guárdalo en un lugar seguro; al regenerarlo el
-      código anterior deja de funcionar.
-    </p>
-    <button type="button" (click)="regenerateRecoveryCode()" [disabled]="busy()">Generar nuevo código</button>
-
-    @if (newRecoveryCode(); as code) {
-      <div class="recovery-box">
-        <p><strong>Nuevo código (guárdalo ahora, no se mostrará de nuevo):</strong></p>
-        <code>{{ code }}</code>
-      </div>
-    }
-  </section>
-
   @if (statusMessage()) {
     <p class="status" [class.error]="statusIsError()">{{ statusMessage() }}</p>
   }

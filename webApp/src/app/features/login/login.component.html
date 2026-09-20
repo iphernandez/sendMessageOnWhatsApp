@@ -48,46 +48,14 @@
   }
 
   @if (mode() === 'forgot') {
-    <form (ngSubmit)="resetPassword()">
+    <form (ngSubmit)="forgotPassword()">
       <label>
         Correo electrónico
         <input type="email" required [ngModel]="email()" (ngModelChange)="email.set($event)" name="forgotEmail" />
       </label>
-      <label>
-        Código de recuperación
-        <input
-          type="text"
-          required
-          [ngModel]="recoveryCode()"
-          (ngModelChange)="recoveryCode.set($event)"
-          name="recoveryCode"
-          placeholder="XXXX-XXXX-XXXX"
-        />
-      </label>
-      <label>
-        Nueva contraseña (mínimo 8 caracteres)
-        <input
-          type="password"
-          required
-          minlength="8"
-          [ngModel]="newPassword()"
-          (ngModelChange)="newPassword.set($event)"
-          name="newPassword"
-        />
-      </label>
-      <button type="submit" [disabled]="busy()">Restablecer contraseña</button>
-      <p class="hint">
-        El código de recuperación se muestra una sola vez al crear la cuenta o al regenerarlo en "Mi cuenta". Si lo
-        perdiste, pide a un administrador que restablezca tu contraseña.
-      </p>
+      <button type="submit" [disabled]="busy()">Enviar enlace de restablecimiento</button>
+      <p class="hint">Te enviaremos un correo con un enlace para elegir una nueva contraseña.</p>
     </form>
-  }
-
-  @if (registeredRecoveryCode(); as code) {
-    <div class="recovery-box">
-      <p><strong>Tu código de recuperación (guárdalo ahora, no se mostrará de nuevo):</strong></p>
-      <code>{{ code }}</code>
-    </div>
   }
 
   @if (statusMessage()) {

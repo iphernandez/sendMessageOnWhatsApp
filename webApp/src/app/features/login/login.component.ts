@@ -16,13 +16,10 @@ export class LoginComponent {
   readonly busy = signal(false);
   readonly statusMessage = signal('');
   readonly statusIsError = signal(false);
-  readonly registeredRecoveryCode = signal<string | null>(null);
 
   readonly email = signal('');
   readonly name = signal('');
   readonly password = signal('');
-  readonly recoveryCode = signal('');
-  readonly newPassword = signal('');
 
   constructor(
     private readonly auth: AuthService,
@@ -33,7 +30,6 @@ export class LoginComponent {
     this.mode.set(mode);
     this.statusMessage.set('');
     this.statusIsError.set(false);
-    this.registeredRecoveryCode.set(null);
   }
 
   async login(): Promise<void> {
@@ -61,25 +57,21 @@ export class LoginComponent {
     }
 
     this.statusIsError.set(false);
-    this.registeredRecoveryCode.set(result.recoveryCode ?? null);
-    this.statusMessage.set('Cuenta creada. Guarda tu código de recuperación: no volverá a mostrarse.');
+    this.statusMessage.set('Cuenta creada. Ya puedes iniciar sesión.');
     this.password.set('');
+    this.setMode('login');
   }
 
-  async resetPassword(): Promise<void> {
+  async forgotPassword(): Promise<void> {
     this.busy.set(true);
-    const result = await this.auth.resetPasswordWithRecoveryCode(this.email(), this.recoveryCode(), this.newPassword());
+    const result = await this.auth.sendForgotPasswordEmail(this.email());
     this.busy.set(false);
 
     this.statusIsError.set(!result.success);
     this.statusMessage.set(
-      result.success ? 'Contraseña actualizada. Ya puedes iniciar sesión.' : (result.message ?? 'No se pudo restablecer la contraseña.')
+      result.success
+        ? 'Si el correo existe, se envió un enlace para restablecer la contraseña.'
+        : (result.message ?? 'No se pudo enviar el correo de restablecimiento.')
     );
-    if (result.success) {
-      this.password.set('');
-      this.newPassword.set('');
-      this.recoveryCode.set('');
-      this.setMode('login');
-    }
   }
 }

@@ -1,13 +1,27 @@
 import { Injectable, signal } from '@angular/core';
+import {
+  User,
+  createUserWithEmailAndPassword,
+  confirmPasswordReset as fbConfirmPasswordReset,
+  EmailAuthProvider,
+  onAuthStateChanged,
+  reauthenticateWithCredential,
+  sendPasswordResetEmail,
+  signInWithEmailAndPassword,
+  signOut,
+  updatePassword,
+  verifyPasswordResetCode
+} from 'firebase/auth';
+import { collection, doc, getDoc, getDocs, query, setDoc, updateDoc, where } from 'firebase/firestore';
+import { firebaseAuth, firestore } from './firebase';
 import { DataStoreService } from './data-store.service';
-import { GithubSyncService } from './github-sync.service';
-import { PublicUser, UserRecord } from '../models/user.model';
+import { RemoteSyncService } from './remote-sync.service';
+import { PublicUser } from '../models/user.model';
+import { environment } from '../../../environments/environment';
 
-const PBKDF2_ITERATIONS = 150_000;
-const CURRENT_USER_KEY = 'currentUserId';
-const CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // no O/0/I/1, avoids ambiguous characters
 const MIN_PASSWORD_LENGTH = 8;
-const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const USERS_COLLECTION = 'users';
+const SEED_STATUS_DOC = 'meta/seedStatus';
 
 // Seed account requested by the repo owner; password must be changed on first login.
 const SEED_ADMIN_EMAIL = 'i.patricio.hernandez@gmail.com';
@@ -19,69 +33,33 @@ export interface AuthResult {
   message?: string;
 }
 
-export interface RegisterResult extends AuthResult {
-  recoveryCode?: string;
-}
-
-export interface ResetPasswordResult extends AuthResult {
-  tempPassword?: string;
-}
-
-function bytesToHex(bytes: Uint8Array): string {
-  return Array.from(bytes)
-    .map((b) => b.toString(16).padStart(2, '0'))
-    .join('');
-}
-
-function hexToBytes(hex: string): Uint8Array {
-  const bytes = new Uint8Array(hex.length / 2);
-  for (let i = 0; i < bytes.length; i++) {
-    bytes[i] = parseInt(hex.substring(i * 2, i * 2 + 2), 16);
+function friendlyAuthError(error: unknown): string {
+  const code = (error as { code?: string })?.code ?? '';
+  switch (code) {
+    case 'auth/invalid-credential':
+    case 'auth/wrong-password':
+    case 'auth/user-not-found':
+      return 'Correo o contraseña incorrectos.';
+    case 'auth/email-already-in-use':
+      return 'Ya existe una cuenta con ese correo.';
+    case 'auth/invalid-email':
+      return 'Ingresa un correo electrónico válido.';
+    case 'auth/weak-password':
+      return `La contraseña debe tener al menos ${MIN_PASSWORD_LENGTH} caracteres.`;
+    case 'auth/too-many-requests':
+      return 'Demasiados intentos. Intenta de nuevo más tarde.';
+    case 'auth/expired-action-code':
+    case 'auth/invalid-action-code':
+      return 'El enlace de restablecimiento ya no es válido. Solicita uno nuevo.';
+    default:
+      return 'Ocurrió un error inesperado. Intenta de nuevo.';
   }
-  return bytes;
-}
-
-/** Derives a salted PBKDF2-SHA256 hash for a password or recovery code. Never stores the plain secret. */
-async function derive(secret: string, saltHex?: string): Promise<{ hash: string; salt: string }> {
-  const salt = saltHex ? hexToBytes(saltHex) : crypto.getRandomValues(new Uint8Array(16));
-  const keyMaterial = await crypto.subtle.importKey('raw', new TextEncoder().encode(secret), 'PBKDF2', false, [
-    'deriveBits'
-  ]);
-  const bits = await crypto.subtle.deriveBits(
-    { name: 'PBKDF2', salt: salt as BufferSource, iterations: PBKDF2_ITERATIONS, hash: 'SHA-256' },
-    keyMaterial,
-    256
-  );
-  return { hash: bytesToHex(new Uint8Array(bits)), salt: bytesToHex(salt) };
-}
-
-/** Avoids short-circuit comparison of secret hashes. */
-function secureEqual(a: string, b: string): boolean {
-  if (a.length !== b.length) return false;
-  let diff = 0;
-  for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
-  return diff === 0;
-}
-
-function randomCode(length: number, groupSize: number): string {
-  const bytes = crypto.getRandomValues(new Uint8Array(length));
-  let code = '';
-  for (let i = 0; i < length; i++) {
-    code += CODE_ALPHABET[bytes[i] % CODE_ALPHABET.length];
-    if (groupSize > 0 && i % groupSize === groupSize - 1 && i !== length - 1) code += '-';
-  }
-  return code;
-}
-
-function toPublicUser(user: UserRecord): PublicUser {
-  const { passwordHash: _passwordHash, passwordSalt: _passwordSalt, recoveryCodeHash: _rch, recoveryCodeSalt: _rcs, ...publicUser } = user;
-  return publicUser;
 }
 
 /**
- * Client-side auth: accounts live in this browser's IndexedDB only (no backend/email server),
- * so they are not synced to GitHub like the rest of the app data. Passwords/recovery codes are
- * salted+hashed with PBKDF2 and never stored or logged in plain text.
+ * Accounts live in Firebase Authentication (credentials, verified server-side — never exposed to
+ * the client) plus a Firestore `users/{uid}` profile doc (name/role/status), so the Usuarios page
+ * lists every account regardless of which browser/device it was created on.
  */
 @Injectable({ providedIn: 'root' })
 export class AuthService {
@@ -91,7 +69,7 @@ export class AuthService {
 
   constructor(
     private readonly store: DataStoreService,
-    private readonly githubSync: GithubSyncService
+    private readonly remoteSync: RemoteSyncService
   ) {
     this.initPromise = this.init();
   }
@@ -102,42 +80,64 @@ export class AuthService {
 
   private async init(): Promise<void> {
     await this.seedAdminIfNeeded();
-    await this.restoreSession();
+    await new Promise<void>((resolve) => {
+      const unsubscribe = onAuthStateChanged(firebaseAuth, async (firebaseUser) => {
+        await this.syncCurrentUser(firebaseUser);
+        unsubscribe();
+        resolve();
+      });
+    });
+    onAuthStateChanged(firebaseAuth, (firebaseUser) => void this.syncCurrentUser(firebaseUser));
     this.ready.set(true);
   }
 
-  private async seedAdminIfNeeded(): Promise<void> {
-    const count = await this.store.users.count();
-    if (count > 0) return;
-
-    const { hash, salt } = await derive(SEED_ADMIN_TEMP_PASSWORD);
-    const admin: UserRecord = {
-      id: crypto.randomUUID(),
-      email: SEED_ADMIN_EMAIL.toLowerCase(),
-      name: SEED_ADMIN_NAME,
-      passwordHash: hash,
-      passwordSalt: salt,
-      recoveryCodeHash: null,
-      recoveryCodeSalt: null,
-      isAdmin: true,
-      mustChangePassword: true,
-      createdAt: new Date().toISOString()
-    };
-    await this.store.users.add(admin);
-  }
-
-  private async restoreSession(): Promise<void> {
-    const userId = await this.store.getSetting(CURRENT_USER_KEY);
-    if (!userId) return;
-    const user = await this.store.users.get(userId);
-    if (user) this.currentUser.set(toPublicUser(user));
-  }
-
-  async register(email: string, name: string, password: string): Promise<RegisterResult> {
-    const normalizedEmail = email.trim().toLowerCase();
-    if (!EMAIL_PATTERN.test(normalizedEmail)) {
-      return { success: false, message: 'Ingresa un correo electrónico válido.' };
+  private async syncCurrentUser(firebaseUser: User | null): Promise<void> {
+    if (!firebaseUser) {
+      this.currentUser.set(null);
+      return;
     }
+    const profile = await this.loadProfile(firebaseUser.uid);
+    if (!profile || profile.disabled) {
+      this.currentUser.set(null);
+      if (profile?.disabled) await signOut(firebaseAuth);
+      return;
+    }
+    this.currentUser.set(profile);
+    await this.autoSyncSharedDataIfNeeded();
+  }
+
+  private async loadProfile(uid: string): Promise<PublicUser | null> {
+    const snapshot = await getDoc(doc(firestore, USERS_COLLECTION, uid));
+    if (!snapshot.exists()) return null;
+    return { id: uid, ...(snapshot.data() as Omit<PublicUser, 'id'>) };
+  }
+
+  /** Runs once globally (guarded by a public `meta/seedStatus` doc) so the seed admin exists in Firestore. */
+  private async seedAdminIfNeeded(): Promise<void> {
+    const seedRef = doc(firestore, SEED_STATUS_DOC);
+    const seedSnap = await getDoc(seedRef);
+    if (seedSnap.exists()) return;
+
+    try {
+      const credential = await createUserWithEmailAndPassword(firebaseAuth, SEED_ADMIN_EMAIL, SEED_ADMIN_TEMP_PASSWORD);
+      await setDoc(doc(firestore, USERS_COLLECTION, credential.user.uid), {
+        email: SEED_ADMIN_EMAIL.toLowerCase(),
+        name: SEED_ADMIN_NAME,
+        isAdmin: true,
+        disabled: false,
+        mustChangePassword: true,
+        createdAt: new Date().toISOString()
+      });
+      await signOut(firebaseAuth);
+    } catch (error) {
+      // If another browser/tab already created it (auth/email-already-in-use), that's fine — just mark seeded.
+      if ((error as { code?: string })?.code !== 'auth/email-already-in-use') throw error;
+    } finally {
+      await setDoc(seedRef, { seeded: true, seededAt: new Date().toISOString() });
+    }
+  }
+
+  async register(email: string, name: string, password: string): Promise<AuthResult> {
     if (!name.trim()) {
       return { success: false, message: 'Ingresa tu nombre.' };
     }
@@ -145,44 +145,36 @@ export class AuthService {
       return { success: false, message: `La contraseña debe tener al menos ${MIN_PASSWORD_LENGTH} caracteres.` };
     }
 
-    const existing = await this.store.users.where('email').equals(normalizedEmail).first();
-    if (existing) {
-      return { success: false, message: 'Ya existe una cuenta con ese correo.' };
+    const normalizedEmail = email.trim().toLowerCase();
+    try {
+      const credential = await createUserWithEmailAndPassword(firebaseAuth, normalizedEmail, password);
+      await setDoc(doc(firestore, USERS_COLLECTION, credential.user.uid), {
+        email: normalizedEmail,
+        name: name.trim(),
+        isAdmin: false,
+        disabled: false,
+        mustChangePassword: false,
+        createdAt: new Date().toISOString()
+      });
+      await signOut(firebaseAuth); // Registering doesn't auto-login; user logs in explicitly.
+      return { success: true };
+    } catch (error) {
+      return { success: false, message: friendlyAuthError(error) };
     }
-
-    const { hash, salt } = await derive(password);
-    const recoveryCode = randomCode(12, 4);
-    const recovery = await derive(recoveryCode);
-    const user: UserRecord = {
-      id: crypto.randomUUID(),
-      email: normalizedEmail,
-      name: name.trim(),
-      passwordHash: hash,
-      passwordSalt: salt,
-      recoveryCodeHash: recovery.hash,
-      recoveryCodeSalt: recovery.salt,
-      isAdmin: false,
-      mustChangePassword: false,
-      createdAt: new Date().toISOString()
-    };
-    await this.store.users.add(user);
-    return { success: true, recoveryCode };
   }
 
   async login(email: string, password: string): Promise<AuthResult> {
-    const normalizedEmail = email.trim().toLowerCase();
-    const user = await this.store.users.where('email').equals(normalizedEmail).first();
-    if (!user) return { success: false, message: 'Correo o contraseña incorrectos.' };
-
-    const { hash } = await derive(password, user.passwordSalt);
-    if (!secureEqual(hash, user.passwordHash)) {
-      return { success: false, message: 'Correo o contraseña incorrectos.' };
+    try {
+      const credential = await signInWithEmailAndPassword(firebaseAuth, email.trim().toLowerCase(), password);
+      const profile = await this.loadProfile(credential.user.uid);
+      if (!profile || profile.disabled) {
+        await signOut(firebaseAuth);
+        return { success: false, message: 'Esta cuenta está deshabilitada.' };
+      }
+      return { success: true };
+    } catch (error) {
+      return { success: false, message: friendlyAuthError(error) };
     }
-
-    await this.store.setSetting(CURRENT_USER_KEY, user.id);
-    this.currentUser.set(toPublicUser(user));
-    await this.autoSyncSharedDataIfNeeded();
-    return { success: true };
   }
 
   private async autoSyncSharedDataIfNeeded(): Promise<void> {
@@ -197,83 +189,80 @@ export class AuthService {
     }
 
     try {
-      const token = await this.store.getGithubToken();
-      const { data } = await this.githubSync.pull(token ?? undefined);
-      await this.store.importAll(data);
+      const remote = await this.remoteSync.pull();
+      if (remote) await this.store.importAll(remote.data);
     } catch {
       // Ignore sync failures during first login; the user can still use the app with local data or retry later.
     }
   }
 
   logout(): void {
-    void this.store.clearSetting(CURRENT_USER_KEY);
-    this.currentUser.set(null);
+    void signOut(firebaseAuth);
   }
 
   async changePassword(currentPassword: string, newPassword: string): Promise<AuthResult> {
+    const firebaseUser = firebaseAuth.currentUser;
     const current = this.currentUser();
-    if (!current) return { success: false, message: 'Debes iniciar sesión.' };
+    if (!firebaseUser || !current) return { success: false, message: 'Debes iniciar sesión.' };
     if (newPassword.length < MIN_PASSWORD_LENGTH) {
       return { success: false, message: `La contraseña debe tener al menos ${MIN_PASSWORD_LENGTH} caracteres.` };
     }
 
-    const user = await this.store.users.get(current.id);
-    if (!user) return { success: false, message: 'Usuario no encontrado.' };
-
-    const { hash } = await derive(currentPassword, user.passwordSalt);
-    if (!secureEqual(hash, user.passwordHash)) {
-      return { success: false, message: 'La contraseña actual no es correcta.' };
+    try {
+      await reauthenticateWithCredential(firebaseUser, EmailAuthProvider.credential(current.email, currentPassword));
+      await updatePassword(firebaseUser, newPassword);
+      await updateDoc(doc(firestore, USERS_COLLECTION, current.id), { mustChangePassword: false });
+      this.currentUser.set({ ...current, mustChangePassword: false });
+      return { success: true };
+    } catch (error) {
+      if ((error as { code?: string })?.code === 'auth/invalid-credential') {
+        return { success: false, message: 'La contraseña actual no es correcta.' };
+      }
+      return { success: false, message: friendlyAuthError(error) };
     }
-
-    const next = await derive(newPassword);
-    await this.store.users.update(user.id, {
-      passwordHash: next.hash,
-      passwordSalt: next.salt,
-      mustChangePassword: false
-    });
-    this.currentUser.set({ ...current, mustChangePassword: false });
-    return { success: true };
   }
 
-  /** Regenerates the logged-in user's recovery code. The plain code is returned once and never stored. */
-  async generateNewRecoveryCode(): Promise<string | null> {
-    const current = this.currentUser();
-    if (!current) return null;
-
-    const recoveryCode = randomCode(12, 4);
-    const { hash, salt } = await derive(recoveryCode);
-    await this.store.users.update(current.id, { recoveryCodeHash: hash, recoveryCodeSalt: salt });
-    return recoveryCode;
+  /** Sends a real password-reset email via Firebase; the link opens /restablecer-contrasena in this app. */
+  async sendForgotPasswordEmail(email: string): Promise<AuthResult> {
+    try {
+      await sendPasswordResetEmail(firebaseAuth, email.trim().toLowerCase(), {
+        url: environment.passwordResetContinueUrl,
+        handleCodeInApp: true
+      });
+      return { success: true };
+    } catch (error) {
+      // Don't reveal whether the email exists; still report success-shaped message for unknown accounts.
+      if ((error as { code?: string })?.code === 'auth/user-not-found') return { success: true };
+      return { success: false, message: friendlyAuthError(error) };
+    }
   }
 
-  async resetPasswordWithRecoveryCode(email: string, recoveryCode: string, newPassword: string): Promise<AuthResult> {
+  async verifyResetCode(oobCode: string): Promise<{ email: string } | null> {
+    try {
+      const email = await verifyPasswordResetCode(firebaseAuth, oobCode);
+      return { email };
+    } catch {
+      return null;
+    }
+  }
+
+  async confirmPasswordReset(oobCode: string, newPassword: string): Promise<AuthResult> {
     if (newPassword.length < MIN_PASSWORD_LENGTH) {
       return { success: false, message: `La contraseña debe tener al menos ${MIN_PASSWORD_LENGTH} caracteres.` };
     }
-
-    const normalizedEmail = email.trim().toLowerCase();
-    const user = await this.store.users.where('email').equals(normalizedEmail).first();
-    if (!user?.recoveryCodeHash || !user.recoveryCodeSalt) {
-      return { success: false, message: 'Correo o código de recuperación incorrectos.' };
+    try {
+      await fbConfirmPasswordReset(firebaseAuth, oobCode, newPassword);
+      return { success: true };
+    } catch (error) {
+      return { success: false, message: friendlyAuthError(error) };
     }
-
-    const { hash } = await derive(recoveryCode.trim().toUpperCase(), user.recoveryCodeSalt);
-    if (!secureEqual(hash, user.recoveryCodeHash)) {
-      return { success: false, message: 'Correo o código de recuperación incorrectos.' };
-    }
-
-    const next = await derive(newPassword);
-    await this.store.users.update(user.id, {
-      passwordHash: next.hash,
-      passwordSalt: next.salt,
-      mustChangePassword: false
-    });
-    return { success: true };
   }
 
   async listUsers(): Promise<PublicUser[]> {
-    const users = await this.store.users.toArray();
-    return users.map(toPublicUser).sort((a, b) => a.email.localeCompare(b.email));
+    const snapshot = await getDocs(collection(firestore, USERS_COLLECTION));
+    return snapshot.docs
+      .map((d) => ({ id: d.id, ...(d.data() as Omit<PublicUser, 'id'>) }))
+      .sort((a, b) => a.email.localeCompare(b.email));
   }
 
   /** Only an existing administrator can promote/demote accounts; the last remaining admin cannot be demoted. */
@@ -281,55 +270,50 @@ export class AuthService {
     const requester = this.currentUser();
     if (!requester?.isAdmin) return { success: false, message: 'Solo un administrador puede hacer esto.' };
 
-    const users = await this.store.users.toArray();
-    const target = users.find((u) => u.id === userId);
-    if (!target) return { success: false, message: 'Usuario no encontrado.' };
-
     if (!isAdmin) {
-      const otherAdmins = users.filter((u) => u.isAdmin && u.id !== userId);
-      if (otherAdmins.length === 0) {
-        return { success: false, message: 'Debe existir al menos un administrador.' };
-      }
+      const guard = await this.blockedIfLastAdmin(userId);
+      if (guard) return guard;
     }
 
-    await this.store.users.update(userId, { isAdmin });
+    await updateDoc(doc(firestore, USERS_COLLECTION, userId), { isAdmin });
     if (requester.id === userId) {
       this.currentUser.set({ ...requester, isAdmin });
     }
     return { success: true };
   }
 
-  async deleteUser(userId: string): Promise<AuthResult> {
+  /** Disables login for the account. Full deletion isn't available without a server-side Admin SDK. */
+  async setDisabled(userId: string, disabled: boolean): Promise<AuthResult> {
     const requester = this.currentUser();
     if (!requester?.isAdmin) return { success: false, message: 'Solo un administrador puede hacer esto.' };
-    if (requester.id === userId) return { success: false, message: 'No puedes eliminar tu propia cuenta.' };
+    if (requester.id === userId) return { success: false, message: 'No puedes deshabilitar tu propia cuenta.' };
 
-    const users = await this.store.users.toArray();
-    const target = users.find((u) => u.id === userId);
-    if (!target) return { success: false, message: 'Usuario no encontrado.' };
-
-    if (target.isAdmin) {
-      const otherAdmins = users.filter((u) => u.isAdmin && u.id !== userId);
-      if (otherAdmins.length === 0) {
-        return { success: false, message: 'Debe existir al menos un administrador.' };
-      }
+    if (disabled) {
+      const guard = await this.blockedIfLastAdmin(userId);
+      if (guard) return guard;
     }
 
-    await this.store.users.delete(userId);
+    await updateDoc(doc(firestore, USERS_COLLECTION, userId), { disabled });
     return { success: true };
   }
 
-  /** Admin-assisted reset for a user who lost both their password and recovery code. Returns the plain temp password once. */
-  async adminResetPassword(userId: string): Promise<ResetPasswordResult> {
+  private async blockedIfLastAdmin(userId: string): Promise<AuthResult | null> {
+    const target = await this.loadProfile(userId);
+    if (!target) return { success: false, message: 'Usuario no encontrado.' };
+    if (!target.isAdmin) return null;
+
+    const admins = await getDocs(query(collection(firestore, USERS_COLLECTION), where('isAdmin', '==', true)));
+    const remaining = admins.docs.filter((d) => d.id !== userId);
+    if (remaining.length === 0) {
+      return { success: false, message: 'Debe existir al menos un administrador.' };
+    }
+    return null;
+  }
+
+  /** Admin-triggered reset: sends the target user a real password-reset email (no temp password to relay). */
+  async adminSendResetEmail(user: PublicUser): Promise<AuthResult> {
     const requester = this.currentUser();
     if (!requester?.isAdmin) return { success: false, message: 'Solo un administrador puede hacer esto.' };
-
-    const user = await this.store.users.get(userId);
-    if (!user) return { success: false, message: 'Usuario no encontrado.' };
-
-    const tempPassword = randomCode(10, 0);
-    const { hash, salt } = await derive(tempPassword);
-    await this.store.users.update(userId, { passwordHash: hash, passwordSalt: salt, mustChangePassword: true });
-    return { success: true, tempPassword };
+    return this.sendForgotPasswordEmail(user.email);
   }
 }

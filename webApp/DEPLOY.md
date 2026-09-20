@@ -3,6 +3,40 @@
 Estos pasos son **únicos** (solo la primera vez). Después de esto, cada `push` a `main` que toque
 `webApp/**` publica automáticamente vía GitHub Actions.
 
+## 0. Crear el proyecto Firebase (cuentas de usuario y datos compartidos)
+
+Las cuentas (login/roles) y los datos de la app (jugadores, registros semanales, TDP, configuración
+de temporada) usan **Firebase Authentication + Firestore**, gratis (plan Spark, sin tarjeta de
+crédito). Es necesario configurarlo antes de publicar:
+
+1. Ve a [console.firebase.google.com](https://console.firebase.google.com) → **Add project** →
+   dale un nombre (ej. `ffch-puntuacion`) → puedes desactivar Google Analytics, no hace falta.
+2. En el menú lateral: **Security → Authentication** → pestaña **Sign-in method** →
+   habilita el proveedor **Email/Password** → **Save**.
+3. **Databases & Storage → Firestore → Create database** → modo **Production mode** → elige una
+   ubicación cercana (ej. `us-central`) → **Create**.
+4. En **Databases & Storage → Firestore → Rules**, pega el contenido de [`firestore.rules`](./firestore.rules) de este
+   repo y presiona **Publish**.
+5. En **Security → Authentication → Settings → Authorized domains**, agrega `iphernandez.github.io` (y
+   `localhost` ya viene por defecto, útil para desarrollo local).
+6. Registra una app web para obtener el `firebaseConfig`. Dos formas de llegar ahí (la UI de Firebase
+   cambia de vez en cuando):
+   - Desde el **Project Overview** (la página de inicio del proyecto), busca los íconos de plataforma
+     (`</>` Web, Android, iOS) y haz clic en el ícono **`</>`**.
+   - O desde el ícono de engrane (arriba a la izquierda) → **Project settings** → pestaña **General**
+     → baja hasta la tarjeta **"Your apps"** (si no hay apps todavía, verás los mismos íconos de
+     plataforma ahí).
+   - Dale un apodo a la app (ej. `webApp`) → **Register app** → copia el objeto `firebaseConfig` que
+     te muestra (no hace falta Firebase Hosting, puedes saltar ese paso).
+7. Pega esos valores en [`src/environments/environment.ts`](./src/environments/environment.ts)
+   (reemplaza los `REPLACE_ME`). Es seguro que este archivo sea público: la seguridad la dan las
+   reglas de Firestore/Auth, no el secreto de esta config.
+8. (Opcional pero recomendado) En **Security → Authentication → Templates → Password reset**, personaliza el
+   correo de restablecimiento de contraseña al español si quieres.
+
+Con esto, al abrir la app por primera vez se crea automáticamente la cuenta administradora inicial
+(`i.patricio.hernandez@gmail.com`, contraseña temporal, debe cambiarla al iniciar sesión).
+
 ## 1. Activar GitHub Pages con origen "GitHub Actions"
 
 1. Ve a **Settings → Pages** en el repositorio.
@@ -21,30 +55,11 @@ Estos pasos son **únicos** (solo la primera vez). Después de esto, cada `push`
   https://iphernandez.github.io/sendMessageOnWhatsApp/
   ```
 
-## 3. Crear el Personal Access Token (PAT) para sincronizar datos
-
-La app en sí es pública y de solo lectura para cualquier visitante hasta que alguien ingresa un PAT en
-**Ajustes** para poder guardar cambios. Recomendado: **fine-grained token**, no el token clásico.
-
-1. GitHub → **Settings** (de tu cuenta, no del repo) → **Developer settings → Personal access tokens →
-   Fine-grained tokens → Generate new token**.
-2. **Resource owner**: tu usuario/organización dueña del repo.
-3. **Repository access**: "Only select repositories" → elige únicamente `sendMessageOnWhatsApp`.
-4. **Permissions → Repository permissions → Contents**: **Read and write**. Deja todo lo demás en "No access".
-5. **Expiration**: pon una fecha (ej. 90 días); tendrás que regenerarlo al vencer.
-6. Genera el token y **cópialo una sola vez** (GitHub no lo vuelve a mostrar).
-7. En la app, ve a **Ajustes → Token de GitHub** y pégalo. Se guarda solo en IndexedDB de ese navegador.
-
-### Rotar o revocar el token
-
-- Si el token se filtra o ya no lo necesitas: GitHub → **Developer settings → Fine-grained tokens** →
-  selecciona el token → **Delete**. Luego en la app, **Ajustes → Olvidar token**.
-- Repite el proceso de creación para emitir uno nuevo cuando el actual expire.
-
-## 4. Verificación
+## 3. Verificación
 
 1. Abre `https://iphernandez.github.io/sendMessageOnWhatsApp/` y confirma que el Dashboard carga.
 2. Navega a otra pantalla (ej. `#/roster`) y **refresca la página** — debe seguir funcionando gracias al
    ruteo por hash (`withHashLocation()`), sin dar 404.
-3. En **Ajustes**, ingresa el PAT y prueba "⬇ Sincronizar desde GitHub" y luego "⬆ Guardar cambios en
-   GitHub" para confirmar el flujo de lectura/escritura contra `FFCH_Puntuacion/data/ffch-puntuacion.json`.
+3. Inicia sesión como administrador y en **Ajustes** prueba "⬇ Sincronizar desde Firestore" y luego
+   "⬆ Guardar cambios en Firestore" para confirmar el flujo de lectura/escritura contra el documento
+   `data/ffch-puntuacion`.

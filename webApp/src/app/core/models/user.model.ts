@@ -1,19 +1,13 @@
-/** Persisted user account. Password/recovery secrets are never stored or transmitted in plain text. */
-export interface UserRecord {
+/**
+ * Profile document stored in Firestore `users/{uid}`, keyed by the Firebase Authentication uid.
+ * Credentials (password) live only in Firebase Authentication, never in this document/collection.
+ */
+export interface PublicUser {
   id: string;
   email: string;
   name: string;
-  passwordHash: string;
-  passwordSalt: string;
-  recoveryCodeHash: string | null;
-  recoveryCodeSalt: string | null;
   isAdmin: boolean;
+  disabled: boolean;
   mustChangePassword: boolean;
   createdAt: string;
 }
-
-/** Safe-to-display projection of a UserRecord, with all secret material stripped out. */
-export type PublicUser = Omit<
-  UserRecord,
-  'passwordHash' | 'passwordSalt' | 'recoveryCodeHash' | 'recoveryCodeSalt'
->;

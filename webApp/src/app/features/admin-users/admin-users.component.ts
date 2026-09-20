@@ -13,7 +13,6 @@ export class AdminUsersComponent {
   readonly loading = signal(true);
   readonly statusMessage = signal('');
   readonly statusIsError = signal(false);
-  readonly tempPasswordFor = signal<{ userId: string; password: string } | null>(null);
 
   constructor(private readonly auth: AuthService) {
     void this.load();
@@ -30,21 +29,21 @@ export class AdminUsersComponent {
     await this.reportAndReload(result);
   }
 
-  async removeUser(user: PublicUser): Promise<void> {
-    if (!confirm(`¿Eliminar la cuenta de ${user.name} (${user.email})? Esta acción no se puede deshacer.`)) return;
-    const result = await this.auth.deleteUser(user.id);
+  async toggleDisabled(user: PublicUser): Promise<void> {
+    const action = user.disabled ? 'habilitar' : 'deshabilitar';
+    if (!confirm(`¿Seguro que quieres ${action} la cuenta de ${user.name} (${user.email})?`)) return;
+    const result = await this.auth.setDisabled(user.id, !user.disabled);
     await this.reportAndReload(result);
   }
 
   async resetPassword(user: PublicUser): Promise<void> {
-    this.tempPasswordFor.set(null);
-    const result = await this.auth.adminResetPassword(user.id);
+    const result = await this.auth.adminSendResetEmail(user);
     this.statusIsError.set(!result.success);
-    this.statusMessage.set(result.success ? '' : (result.message ?? 'No se pudo restablecer la contraseña.'));
-    if (result.success && result.tempPassword) {
-      this.tempPasswordFor.set({ userId: user.id, password: result.tempPassword });
-    }
-    await this.load();
+    this.statusMessage.set(
+      result.success
+        ? `Se envió un correo de restablecimiento a ${user.email}.`
+        : (result.message ?? 'No se pudo enviar el correo de restablecimiento.')
+    );
   }
 
   private async reportAndReload(result: { success: boolean; message?: string }): Promise<void> {

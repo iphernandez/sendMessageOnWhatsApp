@@ -14,7 +14,6 @@ export class AccountComponent {
   readonly busy = signal(false);
   readonly statusMessage = signal('');
   readonly statusIsError = signal(false);
-  readonly newRecoveryCode = signal<string | null>(null);
 
   constructor(readonly auth: AuthService) {}
 
@@ -29,12 +28,5 @@ export class AccountComponent {
       this.currentPassword.set('');
       this.newPassword.set('');
     }
-  }
-
-  async regenerateRecoveryCode(): Promise<void> {
-    this.busy.set(true);
-    const code = await this.auth.generateNewRecoveryCode();
-    this.busy.set(false);
-    this.newRecoveryCode.set(code);
   }
 }

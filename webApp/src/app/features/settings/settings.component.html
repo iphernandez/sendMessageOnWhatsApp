@@ -1,31 +1,14 @@
 <h1>Ajustes / Administración</h1>
 
 <section>
-  <h2>Token de GitHub (PAT)</h2>
-  <p class="warning">
-    Usa un <strong>fine-grained Personal Access Token</strong> limitado <strong>solo a este repositorio</strong>, con
-    permiso <strong>Contents: Read and write</strong> únicamente, y con fecha de expiración. Se guarda solo en
-    IndexedDB de este navegador, nunca en localStorage ni se envía a nadie más que a
-    <code>api.github.com</code>. Trátalo como una contraseña.
+  <h2>Sincronización con Firestore</h2>
+  <p class="hint">
+    Los datos (jugadores, registros semanales, TDP, configuración de temporada) se guardan en Firestore, compartidos
+    entre todos los dispositivos. Solo administradores pueden guardar cambios (reglas de seguridad de Firestore).
   </p>
-
-  @if (admin.hasToken()) {
-    <p>✅ Token configurado en este navegador.</p>
-    <button type="button" (click)="forgetToken()">Olvidar token</button>
-  } @else {
-    <div class="inline-form">
-      <input type="password" placeholder="github_pat_..." [(ngModel)]="tokenInput" />
-      <button type="button" (click)="saveToken()">Guardar token</button>
-    </div>
-  }
-</section>
-
-<section>
-  <h2>Sincronización con GitHub</h2>
-  <p>Archivo: <code>FFCH_Puntuacion/data/ffch-puntuacion.json</code></p>
   <div class="inline-form">
-    <button type="button" (click)="pullFromGithub()">⬇ Sincronizar desde GitHub</button>
-    <button type="button" (click)="pushToGithub()">⬆ Guardar cambios en GitHub</button>
+    <button type="button" (click)="pullFromFirestore()">⬇ Sincronizar desde Firestore</button>
+    <button type="button" (click)="pushToFirestore()">⬆ Guardar cambios en Firestore</button>
   </div>
 </section>
 

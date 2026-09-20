@@ -8,6 +8,11 @@ export const routes: Routes = [
     loadComponent: () => import('./features/login/login.component').then((m) => m.LoginComponent)
   },
   {
+    path: 'restablecer-contrasena',
+    loadComponent: () =>
+      import('./features/reset-password/reset-password.component').then((m) => m.ResetPasswordComponent)
+  },
+  {
     path: '',
     canActivate: [authGuard],
     loadComponent: () => import('./features/dashboard/dashboard.component').then((m) => m.DashboardComponent)

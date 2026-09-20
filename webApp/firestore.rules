@@ -1,0 +1,51 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isSelf(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isAdmin() {
+      return isSignedIn() &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true;
+    }
+
+    function notSeededYet() {
+      return !exists(/databases/$(database)/documents/meta/seedStatus);
+    }
+
+    // One doc per Firebase Auth user (uid). Users can read/update their own profile (but never
+    // isAdmin/disabled on themselves); admins can read/list everyone and manage isAdmin/disabled.
+    match /users/{userId} {
+      allow get: if isSelf(userId) || isAdmin();
+      allow list: if isAdmin();
+      allow create: if isSelf(userId) &&
+        request.resource.data.disabled == false &&
+        (request.resource.data.isAdmin == false ||
+          (request.resource.data.isAdmin == true && notSeededYet()));
+      allow update: if isAdmin() ||
+        (isSelf(userId) &&
+          request.resource.data.isAdmin == resource.data.isAdmin &&
+          request.resource.data.disabled == resource.data.disabled);
+      allow delete: if false;
+    }
+
+    // Public flag used only to gate one-time seed-admin creation; harmless if readable by anyone.
+    match /meta/seedStatus {
+      allow get: if true;
+      allow write: if !exists(/databases/$(database)/documents/meta/seedStatus);
+    }
+
+    // Single shared document holding players/weeklyRecords/tdpHistory/seasonConfig. Any signed-in
+    // user can read it (dashboard); only admins can write (replaces the old GitHub PAT gate).
+    match /data/ffch-puntuacion {
+      allow get: if isSignedIn();
+      allow write: if isAdmin();
+    }
+  }
+}

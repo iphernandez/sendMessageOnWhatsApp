@@ -18,20 +18,23 @@ npm run build    # build de producción en dist/webApp/browser
 
 - **Angular 22**, componentes standalone, rutas con `withHashLocation()` (necesario para que las rutas
   funcionen en GitHub Pages, que no soporta rewrites del lado del servidor).
-- **Base de datos local: [Dexie.js](https://dexie.org/) sobre IndexedDB** — no requiere servidor ni
-  configuración; los datos viven en el navegador de quien administra la app.
-- **Sincronización entre dispositivos**: un único archivo
-  [`FFCH_Puntuacion/data/ffch-puntuacion.json`](../FFCH_Puntuacion/data/ffch-puntuacion.json) leído/escrito
-  directamente desde el navegador vía la API de contenidos de GitHub, usando un Personal Access Token (PAT)
-  que el admin ingresa en **Ajustes**. Ver [DEPLOY.md](./DEPLOY.md) para cómo crear ese token.
+- **Base de datos local: [Dexie.js](https://dexie.org/) sobre IndexedDB** — caché/motor de consultas en
+  el navegador; los datos "reales" viven en Firestore (ver abajo).
+- **Cuentas: Firebase Authentication** — credenciales verificadas del lado del servidor de Firebase,
+  nunca expuestas al cliente.
+- **Datos compartidos: Firestore** — un documento (`data/ffch-puntuacion`) con jugadores, registros
+  semanales, TDP y configuración de temporada, más una colección `users` con el perfil (nombre/rol/estado)
+  de cada cuenta. Reglas de seguridad ([`firestore.rules`](./firestore.rules)) controlan quién puede leer/
+  escribir cada uno. Ver [DEPLOY.md](./DEPLOY.md) sección 0 para crear el proyecto Firebase.
 
 ### Servicios principales (`src/app/core/services`)
 
 | Servicio | Responsabilidad |
 |---|---|
-| `DataStoreService` | Wrapper de Dexie/IndexedDB; también guarda el PAT y hace export/import completo. |
+| `DataStoreService` | Wrapper de Dexie/IndexedDB; caché local y export/import completo. |
 | `ScoringService` | Reproduce las fórmulas de `FFCH_Puntuacion/formulas.txt` (`Pts`, `PtosFecha`, `TDP`, `Puntos`) y las reglas de tarjetas de `reglamento.md`. |
-| `GithubSyncService` | Pull/push del JSON de datos vía GitHub Contents API. |
+| `RemoteSyncService` | Pull/push del documento `data/ffch-puntuacion` en Firestore, con control de concurrencia optimista. |
+| `AuthService` | Login/registro/roles sobre Firebase Authentication + Firestore. |
 | `TeamBalancerService` | Arma 2 equipos balanceados por promedio de Puntos ("snake draft"). |
 | `MessageTemplateService` | Rellena plantillas `{{VAR}}` como `convocatoria.md`. |
 | `CsvImportService` | Migración única desde los CSV exportados del Excel original. |
@@ -46,33 +49,32 @@ tomadas para los casos ambiguos (PtsTemporadaAnterior, peso de Team Building, ta
 
 1. Entra a **Ajustes** y, si es la primera vez, usa "Importar desde los CSV originales" para poblar el
    roster y el historial desde los archivos en `FFCH_Puntuacion/`.
-2. Configura tu GitHub PAT (ver [DEPLOY.md](./DEPLOY.md)) para poder sincronizar cambios con el repositorio.
-3. Usa **Captura Semanal** cada fecha para marcar RSVP/Jugó/Sede/Pago/Tarde por jugador.
-4. Usa **Equipos** para armar los 2 equipos balanceados y **Convocatoria** para generar el texto a copiar
+2. Usa **Captura Semanal** cada fecha para marcar RSVP/Jugó/Sede/Pago/Tarde por jugador.
+3. Usa **Equipos** para armar los 2 equipos balanceados y **Convocatoria** para generar el texto a copiar
    a WhatsApp.
-5. Cuando termines de editar, usa "⬆ Guardar cambios en GitHub" en **Ajustes** para que los demás
+4. Cuando termines de editar, usa "⬆ Guardar cambios en Firestore" en **Ajustes** para que los demás
    dispositivos puedan sincronizar los cambios.
 
 ## Matriz de roles
 
 La app distingue dos tipos de acceso:
 
-| Rol | Acceso | Requiere PAT de GitHub | Puede editar datos |
-|---|---|---:|---:|
-| Usuario autenticado no admin | Dashboard y Cuenta | No | No |
-| Administrador | Todo el resto (Roster, Captura Semanal, Equipos, Convocatoria, Ajustes, Usuarios) | Sí, para push de GitHub y administración avanzada | Sí |
+| Rol | Acceso | Puede editar datos |
+|---|---|---:|
+| Usuario autenticado no admin | Dashboard y Cuenta | No |
+| Administrador | Todo el resto (Roster, Captura Semanal, Equipos, Convocatoria, Ajustes, Usuarios) | Sí |
 
 Enrutamiento real:
 
 - `authGuard` protege las pantallas básicas: `/` y `/cuenta`.
 - `adminGuard` protege `/roster`, `/captura`, `/equipos`, `/convocatoria`, `/ajustes` y `/usuarios`.
-- La lectura del dataset compartido se intenta automáticamente al primer login si la base local está vacía; no hace falta un PAT para esa lectura pública si el repo es público.
-- El PAT sigue siendo necesario para escribir en GitHub y para la sincronización que modifica datos compartidos.
+- La lectura del documento compartido (`data/ffch-puntuacion`) está permitida a cualquier usuario autenticado
+  (regla de Firestore); solo administradores pueden escribirlo.
 
 ## Auto-sync en primer login
 
 Cuando un usuario autenticado entra por primera vez y la base local de IndexedDB está vacía, la app intenta
-hacer un pull del archivo compartido `FFCH_Puntuacion/data/ffch-puntuacion.json` desde GitHub.
+hacer un pull del documento compartido `data/ffch-puntuacion` desde Firestore.
 
 Esto tiene dos ventajas importantes:
 
@@ -82,7 +84,7 @@ Esto tiene dos ventajas importantes:
 La lógica es segura por diseño:
 
 - si ya hay datos en la base local, no se sobreescribe automáticamente;
-- si la base local está vacía, se rellena desde GitHub;
+- si la base local está vacía, se rellena desde Firestore;
 - los cambios explícitos y los pushes siguen siendo solo para administradores.
 
 En otras palabras, la sincronización automática es una carga inicial de arranque, no un refresh silencioso en cada login.

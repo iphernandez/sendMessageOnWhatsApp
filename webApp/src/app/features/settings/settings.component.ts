@@ -1,8 +1,7 @@
 import { Component, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { DataStoreService } from '../../core/services/data-store.service';
-import { AdminSessionService } from '../../core/services/admin-session.service';
-import { GithubSyncService } from '../../core/services/github-sync.service';
+import { RemoteSyncService } from '../../core/services/remote-sync.service';
 import { CsvImportService } from '../../core/services/csv-import.service';
 import { FfchData } from '../../core/models/ffch-data.model';
 
@@ -13,59 +12,39 @@ import { FfchData } from '../../core/models/ffch-data.model';
   styleUrl: './settings.component.scss'
 })
 export class SettingsComponent {
-  readonly tokenInput = signal('');
   readonly statusMessage = signal('');
-  readonly lastSha = signal<string | null>(null);
+  readonly lastVersion = signal<number | null>(null);
   readonly csvWarnings = signal<string[]>([]);
 
   constructor(
-    readonly admin: AdminSessionService,
     private readonly store: DataStoreService,
-    private readonly githubSync: GithubSyncService,
+    private readonly remoteSync: RemoteSyncService,
     private readonly csvImport: CsvImportService
   ) {}
 
-  async saveToken(): Promise<void> {
-    const token = this.tokenInput().trim();
-    if (!token) return;
-    await this.admin.setToken(token);
-    this.tokenInput.set('');
-    this.statusMessage.set('Token guardado localmente (IndexedDB).');
-  }
-
-  async forgetToken(): Promise<void> {
-    await this.admin.clearToken();
-    this.statusMessage.set('Token olvidado.');
-  }
-
-  async pullFromGithub(): Promise<void> {
-    const token = await this.admin.getToken();
-    if (!token) {
-      this.statusMessage.set('Configura un token de GitHub primero.');
-      return;
-    }
+  async pullFromFirestore(): Promise<void> {
     try {
-      const { data, sha } = await this.githubSync.pull(token);
-      await this.store.importAll(data);
-      this.lastSha.set(sha);
-      this.statusMessage.set('Datos sincronizados desde GitHub.');
+      const remote = await this.remoteSync.pull();
+      if (!remote) {
+        this.statusMessage.set('Todavía no hay datos guardados en Firestore.');
+        return;
+      }
+      await this.store.importAll(remote.data);
+      this.lastVersion.set(remote.version);
+      this.statusMessage.set('Datos sincronizados desde Firestore.');
     } catch (error) {
       this.statusMessage.set(this.errorMessage(error));
     }
   }
 
-  async pushToGithub(): Promise<void> {
-    const token = await this.admin.getToken();
-    if (!token) {
-      this.statusMessage.set('Configura un token de GitHub primero.');
-      return;
-    }
+  async pushToFirestore(): Promise<void> {
     try {
-      const { sha: currentSha } = await this.githubSync.pull(token);
+      const remote = await this.remoteSync.pull();
+      const expectedVersion = remote?.version ?? 0;
       const data = await this.store.exportAll();
-      const newSha = await this.githubSync.push(token, data, currentSha);
-      this.lastSha.set(newSha);
-      this.statusMessage.set('Datos guardados en GitHub.');
+      const newVersion = await this.remoteSync.push(data, expectedVersion);
+      this.lastVersion.set(newVersion);
+      this.statusMessage.set('Datos guardados en Firestore.');
     } catch (error) {
       this.statusMessage.set(this.errorMessage(error));
     }
