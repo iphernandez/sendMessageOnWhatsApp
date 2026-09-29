@@ -349,13 +349,24 @@ export class WhatsAppHandler {
 
                 const selectedVotes = Array.isArray(votes) ? votes : [votes];
                 const localIdSet = new Set();
-                const msg =
-                    window.require('WAWebCollections').Msg.get(targetMessageId) ||
-                    (
-                        await window
-                            .require('WAWebCollections')
-                            .Msg.getMessagesById([targetMessageId])
-                    )?.messages?.[0];
+                const { Msg, Chat } = window.require('WAWebCollections');
+                const [, remote, hexId] = String(targetMessageId).split('_');
+                // Group messages are keyed by a 4-part id (with participant), so a 3-part id may miss
+                const matchesHex = (m) => hexId && (m?.id?.id === hexId || String(m?.id || '').split('_')[2] === hexId);
+                let msg = Msg.get(targetMessageId);
+
+                if (!msg) {
+                    try {
+                        msg = (await Msg.getMessagesById([targetMessageId]))?.messages?.[0];
+                    } catch {}
+                }
+                if (!msg) {
+                    msg = Msg.getModelsArray().find(matchesHex);
+                }
+                if (!msg && remote) {
+                    const chat = Chat.getModelsArray().find((c) => c?.id?._serialized === remote);
+                    msg = chat?.msgs?.getModelsArray().find(matchesHex);
+                }
 
                 if (!msg) {
                     throw new Error(`Poll message "${targetMessageId}" could not be loaded.`);

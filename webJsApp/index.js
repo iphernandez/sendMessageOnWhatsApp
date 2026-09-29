@@ -482,22 +482,25 @@ async function runAutomatedConvocatoriaFlow(wsaHdl, options = {}) {
     const createdPoll = await wsaHdl.createPoll(groupName, pollQuestion, pollOptions, {
         allowMultipleAnswers,
     });
-    await wsaHdl.voteOnPoll(groupName, pollQuestion, pollAnswer, {
-        pollMessageId: createdPoll?.id?._serialized,
-    });
+    try {
+        await wsaHdl.voteOnPoll(groupName, pollQuestion, pollAnswer, {
+            pollMessageId: createdPoll?.id?._serialized,
+        });
+    } finally {
+        // The convocatoria is already published, so advance the week even if voting fails
+        const currentWeekNumber = Number(convocatoriaConfig.seasons[seasonIndex].WEEK_NUMBER);
+        if (!Number.isFinite(currentWeekNumber)) {
+            throw new Error(
+                `WEEK_NUMBER for season "${season.season}" is not a valid number.`
+            );
+        }
 
-    const currentWeekNumber = Number(convocatoriaConfig.seasons[seasonIndex].WEEK_NUMBER);
-    if (!Number.isFinite(currentWeekNumber)) {
-        throw new Error(
-            `WEEK_NUMBER for season "${season.season}" is not a valid number.`
+        convocatoriaConfig.seasons[seasonIndex].WEEK_NUMBER = currentWeekNumber + 1;
+        fs.writeFileSync(configPath, `${JSON.stringify(rootConfig, null, 4)}\n`, 'utf8');
+        console.log(
+            `Updated config.json: profile "${profileKey}", season "${season.season}" WEEK_NUMBER is now ${convocatoriaConfig.seasons[seasonIndex].WEEK_NUMBER}.`
         );
     }
-
-    convocatoriaConfig.seasons[seasonIndex].WEEK_NUMBER = currentWeekNumber + 1;
-    fs.writeFileSync(configPath, `${JSON.stringify(rootConfig, null, 4)}\n`, 'utf8');
-    console.log(
-        `Updated config.json: profile "${profileKey}", season "${season.season}" WEEK_NUMBER is now ${convocatoriaConfig.seasons[seasonIndex].WEEK_NUMBER}.`
-    );
 
     console.log('Automated convocatoria flow completed successfully.');
 }
