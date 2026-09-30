@@ -192,11 +192,40 @@ export class TeamBalancerComponent {
   }
 
   private formatConvocados(teams: BalancedTeams): string {
+    const gameDate = this.getNextThursday(new Date());
+    const seasonStart = this.getSeasonStart(gameDate);
+    const seasonYear = seasonStart.getFullYear();
+    const gameDay = Date.UTC(gameDate.getFullYear(), gameDate.getMonth(), gameDate.getDate());
+    const seasonStartDay = Date.UTC(seasonStart.getFullYear(), seasonStart.getMonth(), seasonStart.getDate());
+    const weekNumber = Math.floor((gameDay - seasonStartDay) / (7 * 24 * 60 * 60 * 1000)) + 1;
+    const date = `${String(gameDate.getMonth() + 1).padStart(2, '0')}/${String(gameDate.getDate()).padStart(2, '0')}/${gameDate.getFullYear()}`;
     const format = (label: string, team: BalancedTeams['teamA']) => {
-      const names = team.players.map((p) => `${p.nombre}(${p.rating.toFixed(0)})`).join(',\n');
+      const names = team.players
+        .map((player, index) => `${player.nombre}(${player.rating.toFixed(0)})${index < team.players.length - 1 ? ',' : ''}`)
+        .join('\n');
       return `${label}\n${names}\nTOTAL ${team.total.toFixed(0)} | PROM ${team.promedio.toFixed(2)}`;
     };
-    return `${format('🟧 EQUIPO A', teams.teamA)}\n\n${format('🔵 EQUIPO B', teams.teamB)}`;
+
+    return `⚽ ${date} 7:00 PM | Fecha ${weekNumber} - ${seasonYear} | Invierno\n📍 Coloso de Hillsboro\n\n${format('🟧 EQUIPO A', teams.teamA)}\n\n${format('🔵 EQUIPO B', teams.teamB)}\n\n🪑 Sup: Ninguno\n🚫 Susp: Ninguno\n\n_*LAS OPINIONES VERTIDAS EN ESTA ALINEACIÓN SON DE EXCLUSIVA RESPONSABILIDAD DE Chat GPT Y NO REPRESENTAN EL PENSAMIENTO NI LA LÍNEA DE BULLYING DE LA FFCH NI DE NINGUNO DE SUS MIEMBROS. CUALQUIER QUEJA POR FAVOR DIRIGIRLA A LA DIRECCIÓN DE CORREO INDICADA EN EL MENSAJE DE EMAIL*_`;
+  }
+
+  private getNextThursday(from: Date): Date {
+    const daysUntilThursday = (4 - from.getDay() + 7) % 7 || 7;
+    const thursday = new Date(from.getFullYear(), from.getMonth(), from.getDate());
+    thursday.setDate(thursday.getDate() + daysUntilThursday);
+    return thursday;
+  }
+
+  private getSeasonStart(date: Date): Date {
+    let seasonStart = new Date(date.getFullYear(), 9, 1);
+    seasonStart.setDate(seasonStart.getDate() + (4 - seasonStart.getDay() + 7) % 7);
+
+    if (date < seasonStart) {
+      seasonStart = new Date(date.getFullYear() - 1, 9, 1);
+      seasonStart.setDate(seasonStart.getDate() + (4 - seasonStart.getDay() + 7) % 7);
+    }
+
+    return seasonStart;
   }
 
   formatDate(value: string): string {

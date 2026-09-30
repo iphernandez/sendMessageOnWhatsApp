@@ -1,21 +1,21 @@
-⚽ 03/26/2026 7:00 PM | Fecha 13 - 2026 | Invierno
+⚽ 10/01/2026 7:00 PM | Fecha 1 - 2026 | Invierno
 📍 Coloso de Hillsboro
 
-🟧 PANADEROS (Ramiro)
-Ramiro(4), 
-PatoH(5), 
-Jorge(2), 
-Javi T(1), 
-Andrew(1)
-TOTAL 13 | PROM 2.60
+🟧 EQUIPO A
+Pato(10),
+Israel(6),
+Jose(5),
+Amed(4),
+Jonathan(1)
+TOTAL 26 | PROM 5.20
 
-🔵 ALBAÑILES (Jose)
-Jose(3), 
-Juan(3), 
-Channels(3), 
-German(2), 
-Yerko(1)
-TOTAL 12 | PROM 2.40
+🔵 EQUIPO B
+Javier T(8),
+Rafa(6),
+Cristian(5),
+Poncho(4),
+Amed Jr(2)
+TOTAL 25 | PROM 5.00
 
 🪑 Sup: Ninguno
 🚫 Susp: Ninguno
