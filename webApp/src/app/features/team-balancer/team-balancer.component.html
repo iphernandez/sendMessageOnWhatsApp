@@ -19,14 +19,11 @@
   <p>Último ganador: {{ lastWinner() === 'teamA' ? 'Equipo A' : 'Equipo B' }}</p>
 }
 
-<label>
-  Resultado del último partido:
-  <select [ngModel]="lastWinner()" (ngModelChange)="applyLastGameResult($event)">
-    <option [ngValue]="null">Selecciona ganador</option>
-    <option value="teamA">Equipo A ganó</option>
-    <option value="teamB">Equipo B ganó</option>
-  </select>
-</label>
+@if (teams()) {
+  <p>Equipos armados pendientes de resultado. Marca el ganador después del partido para actualizar los ratings.</p>
+  <button type="button" (click)="applyLastGameResult('teamA')">🟧 Equipo A ganó</button>
+  <button type="button" (click)="applyLastGameResult('teamB')">🔵 Equipo B ganó</button>
+}
 
 <h2>Restricciones de equipo</h2>
 <p>Se usa el ID interno del jugador para la regla. El WA number es solo una etiqueta visible.</p>

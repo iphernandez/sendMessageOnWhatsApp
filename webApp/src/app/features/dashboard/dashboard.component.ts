@@ -2,6 +2,7 @@ import { Component, computed, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { DataStoreService } from '../../core/services/data-store.service';
 import { ScoringService, PlayerScoreSummary } from '../../core/services/scoring.service';
+import { TeamBalancerService } from '../../core/services/team-balancer.service';
 
 interface StandingRow {
   playerId: string;
@@ -9,6 +10,7 @@ interface StandingRow {
   galactico: string;
   bullying: string;
   summary: PlayerScoreSummary;
+  rating: number;
 }
 
 @Component({
@@ -24,7 +26,8 @@ export class DashboardComponent {
 
   constructor(
     private readonly store: DataStoreService,
-    private readonly scoring: ScoringService
+    private readonly scoring: ScoringService,
+    private readonly balancer: TeamBalancerService
   ) {
     void this.load();
   }
@@ -38,14 +41,11 @@ export class DashboardComponent {
       this.store.getSeasonConfig()
     ]);
 
-    const rows: StandingRow[] = players
-      .filter((p) => p.activo)
-      .map((player) => ({
-        playerId: player.id,
-        posicion: player.posicion,
-        galactico: player.galactico,
-        bullying: player.bullying,
-        summary: this.scoring.summarizePlayer(
+    const activePlayers = players.filter((p) => p.activo);
+    const summaries = new Map(
+      activePlayers.map((player) => [
+        player.id,
+        this.scoring.summarizePlayer(
           player.id,
           weeklyRecords,
           tdpHistory,
@@ -54,7 +54,21 @@ export class DashboardComponent {
           seasonConfig.ptsTemporadaAnteriorIncludedInSum,
           player.socioFundador
         )
-      }));
+      ])
+    );
+    const maxPoints = Math.max(0, ...Array.from(summaries.values(), (s) => s.puntos));
+
+    const rows: StandingRow[] = activePlayers.map((player) => {
+      const summary = summaries.get(player.id)!;
+      return {
+        playerId: player.id,
+        posicion: player.posicion,
+        galactico: player.galactico,
+        bullying: player.bullying,
+        summary,
+        rating: player.rating ?? this.balancer.toRatingFromPoints(summary.puntos, maxPoints || 1)
+      };
+    });
 
     this.rows.set(rows);
     this.loading.set(false);

@@ -23,18 +23,21 @@
         <th>Apodo</th>
         <th>TDP %</th>
         <th>Puntos</th>
+        <th title="El rating se usa para armar los equipos">Rating*</th>
       </tr>
     </thead>
     <tbody>
       @for (row of sortedRows(); track row.playerId; let i = $index) {
         <tr>
-          <td>{{ i + 1 }}</td>
+          <td class="rank" [class.rank-green]="i < 12" [class.rank-yellow]="i >= 12 && i < 16" [class.rank-red]="i >= 16">{{ i + 1 }}</td>
           <td>{{ row.galactico }}</td>
           <td>{{ row.bullying }}</td>
           <td>{{ (row.summary.tdp * 100).toFixed(0) }}%</td>
           <td>{{ row.summary.puntos.toFixed(2) }}</td>
+          <td>{{ row.rating.toFixed(0) }}</td>
         </tr>
       }
     </tbody>
   </table>
+  <p class="note">* El rating (1-10) se usa para armar los equipos.</p>
 }

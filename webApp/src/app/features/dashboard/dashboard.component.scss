@@ -60,4 +60,30 @@
   tbody tr:hover {
     background: var(--ffch-blue-light);
   }
+
+  td.rank {
+    font-weight: 600;
+    text-align: center;
+  }
+
+  td.rank-green {
+    background: #a8e6b8;
+    color: #1b5e33;
+  }
+
+  td.rank-yellow {
+    background: #fbe7a1;
+    color: #7a5a00;
+  }
+
+  td.rank-red {
+    background: #f5b7b1;
+    color: #8e2a22;
+  }
+}
+
+.note {
+  margin-top: 0.5rem;
+  font-size: 0.85rem;
+  color: var(--ffch-blue-dark);
 }

@@ -17,7 +17,7 @@ interface CaptureRow {
 })
 export class WeeklyCaptureComponent {
   readonly fechas = signal<string[]>([]);
-  readonly selectedFecha = signal<string>(this.today());
+  readonly selectedFecha = signal<string>(this.nextThursday());
   readonly rows = signal<CaptureRow[]>([]);
 
   constructor(private readonly store: DataStoreService) {
@@ -25,13 +25,21 @@ export class WeeklyCaptureComponent {
     void this.loadRows();
   }
 
-  private today(): string {
-    return new Date().toISOString().slice(0, 10);
+  private nextThursday(): string {
+    const date = new Date();
+    date.setDate(date.getDate() + ((4 - date.getDay() + 7) % 7));
+    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+  }
+
+  // Pago applies only from April 1st to September 30th.
+  private isPagoSeason(fecha: string): boolean {
+    const month = Number(fecha.slice(5, 7));
+    return month >= 4 && month <= 9;
   }
 
   async loadFechas(): Promise<void> {
     const records = await this.store.weeklyRecords.toArray();
-    const fechas = Array.from(new Set(records.map((r) => r.fecha))).sort();
+    const fechas = Array.from(new Set(records.map((r) => r.fecha))).sort().reverse();
     this.fechas.set(fechas);
   }
 
@@ -45,12 +53,13 @@ export class WeeklyCaptureComponent {
     const players = await this.store.players.filter((p) => p.activo).sortBy('posicion');
     const existing = await this.store.weeklyRecords.where('fecha').equals(fecha).toArray();
     const byPlayer = new Map(existing.map((r) => [r.playerId, r]));
+    const pago = this.isPagoSeason(fecha);
 
     const rows: CaptureRow[] = players.map((player) => ({
       player,
       record:
         byPlayer.get(player.id) ??
-        ({ id: `${player.id}-${fecha}`, playerId: player.id, fecha, rsvp: null, jugo: null, sede: null, pago: true, tarde: false } as WeeklyRecord)
+        ({ id: `${player.id}-${fecha}`, playerId: player.id, fecha, rsvp: null, jugo: null, sede: null, pago, tarde: false } as WeeklyRecord)
     }));
     this.rows.set(rows);
   }

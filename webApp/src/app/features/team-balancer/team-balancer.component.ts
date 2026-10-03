@@ -5,6 +5,8 @@ import { DataStoreService } from '../../core/services/data-store.service';
 import { ScoringService } from '../../core/services/scoring.service';
 import { TeamBalancerService, BalancedTeams, BalancerPlayer, TeamRestriction } from '../../core/services/team-balancer.service';
 
+const PENDING_TEAMS_KEY = 'team-balancer:pendingTeams';
+
 interface Candidate extends BalancerPlayer {
   selected: boolean;
 }
@@ -43,14 +45,15 @@ export class TeamBalancerComponent {
   }
 
   async load(): Promise<void> {
-    const [allPlayers, weeklyRecords, tdpHistory, seasonConfig, storedWinner, storedHistory, storedRestrictions] = await Promise.all([
+    const [allPlayers, weeklyRecords, tdpHistory, seasonConfig, storedWinner, storedHistory, storedRestrictions, storedPending] = await Promise.all([
       this.store.players.toArray(),
       this.store.weeklyRecords.toArray(),
       this.store.tdpHistory.toArray(),
       this.store.getSeasonConfig(),
       this.store.getSetting('team-balancer:lastWinner'),
       this.store.getSetting('team-balancer:history'),
-      this.store.getSetting('team-balancer:restrictions')
+      this.store.getSetting('team-balancer:restrictions'),
+      this.store.getSetting(PENDING_TEAMS_KEY)
     ]);
 
     this.playerMap = new Map(allPlayers.map((player) => [player.id, player]));
@@ -91,6 +94,16 @@ export class TeamBalancerComponent {
       };
     });
 
+    const pending = storedPending ? (JSON.parse(storedPending) as BalancedTeams) : null;
+    if (pending) {
+      const pendingIds = new Set([...pending.teamA.players, ...pending.teamB.players].map((p) => p.playerId));
+      for (const candidate of candidates) {
+        candidate.selected = pendingIds.has(candidate.playerId);
+      }
+      this.teams.set(pending);
+      this.copyText.set(this.formatConvocados(pending));
+    }
+
     this.candidates.set(candidates);
 
     const winner = storedWinner === 'teamA' || storedWinner === 'teamB' ? storedWinner : null;
@@ -99,11 +112,15 @@ export class TeamBalancerComponent {
     this.restrictions.set(storedRestrictions ? (JSON.parse(storedRestrictions) as TeamRestriction[]) : []);
   }
 
-  buildTeams(): void {
+  async buildTeams(): Promise<void> {
+    if (this.teams() && !confirm('Ya hay equipos armados sin resultado. ¿Reemplazarlos?')) {
+      return;
+    }
     const selected = this.candidates().filter((c) => c.selected);
     const teams = this.balancer.balance(selected, this.restrictions());
     this.teams.set(teams);
     this.copyText.set(this.formatConvocados(teams));
+    await this.store.setSetting(PENDING_TEAMS_KEY, JSON.stringify(teams));
   }
 
   async addRestriction(): Promise<void> {
@@ -144,8 +161,9 @@ export class TeamBalancerComponent {
     const teamAIds = currentTeams.teamA.players.map((p) => p.playerId);
     const teamBIds = currentTeams.teamB.players.map((p) => p.playerId);
 
+    const playedIds = new Set([...teamAIds, ...teamBIds]);
     const nextCandidates = this.balancer.applyLastGameResult(
-      this.candidates().filter((candidate) => candidate.selected),
+      this.candidates().filter((candidate) => playedIds.has(candidate.playerId)),
       winner,
       teamAIds,
       teamBIds
@@ -185,6 +203,11 @@ export class TeamBalancerComponent {
     const nextHistory = [historyEntry, ...this.pastTeams()];
     this.pastTeams.set(nextHistory.slice(0, 10));
     await this.store.setSetting('team-balancer:history', JSON.stringify(this.pastTeams()));
+
+    await this.store.clearSetting(PENDING_TEAMS_KEY);
+    this.teams.set(null);
+    this.copyText.set('');
+    this.candidates.update((list) => list.map((candidate) => ({ ...candidate, selected: false })));
   }
 
   playerLabel(player: { nombre: string; playerId: string; wanumber?: string }): string {
